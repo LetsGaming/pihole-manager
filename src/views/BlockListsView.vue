@@ -61,18 +61,13 @@
               </button>
             </div>
             <div class="suggested-lists mt-3">
-              <div class="text-xs text-muted mb-2">
-                Quick add popular lists:
-              </div>
+              <div class="text-xs text-muted mb-2">Quick add popular lists:</div>
               <div class="flex gap-2" style="flex-wrap: wrap">
                 <button
                   v-for="l in SUGGESTED_LISTS"
                   :key="l.url"
                   class="btn btn-ghost btn-sm"
-                  @click="
-                    newAdlistUrl = l.url;
-                    newAdlistComment = l.name;
-                  "
+                  @click="newAdlistUrl = l.url; newAdlistComment = l.name"
                 >
                   + {{ l.name }}
                 </button>
@@ -82,14 +77,9 @@
 
           <div class="card">
             <div class="card-header">
-              <span class="card-title"
-                >ADLISTS ({{ sortedAdlists.length }})</span
-              >
+              <span class="card-title">ADLISTS ({{ sortedAdlists.length }})</span>
               <div class="flex gap-2">
-                <button
-                  class="btn btn-ghost btn-sm"
-                  @click="triggerGravityUpdate"
-                >
+                <button class="btn btn-ghost btn-sm" @click="triggerGravityUpdate">
                   <ion-icon :icon="cloudDownloadOutline" /> Update Gravity
                 </button>
                 <button class="btn btn-ghost btn-sm" @click="loadAdlists">
@@ -100,9 +90,7 @@
 
             <!-- Active sort pills for adlists -->
             <div v-if="adlistSortKey" class="sort-pills sort-pills--in-card">
-              <span class="text-xs text-muted" style="line-height: 24px"
-                >Sort:</span
-              >
+              <span class="text-xs text-muted" style="line-height: 24px">Sort:</span>
               <span
                 v-for="(level, idx) in adlistSort.levels"
                 :key="level.col"
@@ -110,104 +98,52 @@
               >
                 <span class="sort-pill-priority">{{ idx + 1 }}</span>
                 {{ ADLIST_LABELS[level.col] ?? level.col }}
-                {{ level.dir === "asc" ? "↑" : "↓" }}
-                <button
-                  class="sort-pill-remove"
-                  @click="onAdlistSortRemove(level.col)"
-                >
-                  ×
-                </button>
+                {{ level.dir === 'asc' ? '↑' : '↓' }}
+                <button class="sort-pill-remove" @click="onAdlistSortRemove(level.col)">×</button>
               </span>
-              <button
-                class="btn btn-ghost btn-sm"
-                style="padding: 2px 8px; font-size: 11px"
-                @click="onAdlistSortClear"
-              >
+              <button class="btn btn-ghost btn-sm" style="padding: 2px 8px; font-size: 11px" @click="onAdlistSortClear">
                 Clear sort
               </button>
             </div>
 
             <div v-if="isLoading" class="p-3">
-              <div
-                v-for="i in 4"
-                :key="i"
-                class="skeleton"
-                style="height: 44px; margin-bottom: 6px"
-              />
+              <div v-for="i in 4" :key="i" class="skeleton" style="height: 44px; margin-bottom: 6px" />
             </div>
             <table v-else class="data-table">
               <thead>
                 <tr>
-                  <SortableHeader
-                    col="address"
-                    label="URL"
-                    :sort="adlistSort"
-                    :sort-key="adlistSortKey"
-                    @sort-changed="onAdlistSortChanged"
-                  />
-                  <SortableHeader
-                    col="comment"
-                    label="Comment"
-                    :sort="adlistSort"
-                    :sort-key="adlistSortKey"
-                    @sort-changed="onAdlistSortChanged"
-                  />
-                  <SortableHeader
-                    col="enabled"
-                    label="Enabled"
-                    :sort="adlistSort"
-                    :sort-key="adlistSortKey"
-                    @sort-changed="onAdlistSortChanged"
-                  />
+                  <SortableHeader col="address" label="URL" :sort="adlistSort" :sort-key="adlistSortKey" @sort-changed="onAdlistSortChanged" />
+                  <SortableHeader col="comment" label="Comment" :sort="adlistSort" :sort-key="adlistSortKey" @sort-changed="onAdlistSortChanged" />
+                  <SortableHeader col="enabled" label="Enabled" :sort="adlistSort" :sort-key="adlistSortKey" @sort-changed="onAdlistSortChanged" />
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="list in sortedAdlists" :key="list.id">
                   <td class="mono" style="max-width: 300px">
-                    <span class="truncate" :title="list.address">{{
-                      list.address
-                    }}</span>
+                    <span class="truncate" :title="list.address">{{ list.address }}</span>
                   </td>
                   <td style="color: var(--text-muted); font-size: 12px">
                     {{ list.comment || "—" }}
                   </td>
                   <td>
-                    <span
-                      class="badge"
-                      :class="list.enabled ? 'badge-green' : 'badge-gray'"
-                    >
+                    <span class="badge" :class="list.enabled ? 'badge-green' : 'badge-gray'">
                       {{ list.enabled ? "On" : "Off" }}
                     </span>
                   </td>
                   <td>
                     <div class="flex gap-2">
-                      <button
-                        class="btn btn-ghost btn-sm btn-icon"
-                        title="Copy"
-                        @click="copyToClipboard(list.address)"
-                      >
+                      <button class="btn btn-ghost btn-sm btn-icon" title="Copy" @click="copyToClipboard(list.address)">
                         <ion-icon :icon="copyOutline" />
                       </button>
-                      <button
-                        class="btn btn-danger btn-sm btn-icon"
-                        title="Remove"
-                        @click="removeAdlist(list.address)"
-                      >
+                      <button class="btn btn-danger btn-sm btn-icon" title="Remove" @click="removeAdlist(list.address)">
                         <ion-icon :icon="trashOutline" />
                       </button>
                     </div>
                   </td>
                 </tr>
                 <tr v-if="!sortedAdlists.length && !isLoading">
-                  <td
-                    colspan="4"
-                    style="
-                      text-align: center;
-                      padding: 30px;
-                      color: var(--text-muted);
-                    "
-                  >
+                  <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted)">
                     No adlists configured
                   </td>
                 </tr>
@@ -224,9 +160,9 @@
             @add="addDomain"
           />
           <DomainListTable
-            :title="currentTabLabel"
             v-model:search-query="domainSearch"
-            :entries="_domainList"
+            :title="currentTabLabel"
+            :entries="domainList"
             :loading="isLoading"
             @refresh="loadDomainList"
             @remove="removeDomain"
@@ -242,12 +178,8 @@
 import { defineComponent, markRaw } from "vue";
 import { IonPage, IonContent, IonIcon } from "@ionic/vue";
 import {
-  shieldOutline,
-  addOutline,
-  cloudDownloadOutline,
-  refreshOutline,
-  copyOutline,
-  trashOutline,
+  shieldOutline, addOutline, cloudDownloadOutline,
+  refreshOutline, copyOutline, trashOutline,
 } from "ionicons/icons";
 
 import PageHeader from "@/components/ui/PageHeader.vue";
@@ -266,27 +198,18 @@ import PiholeApiService from "@/services/piholeApi";
 import type { Adlist, DomainEntry, DomainListType } from "@/types/api";
 
 const LIST_TABS = [
-  { key: "adlists", label: "Adlists" },
-  { key: "black", label: "Blacklist" },
-  { key: "white", label: "Whitelist" },
+  { key: "adlists",     label: "Adlists" },
+  { key: "black",       label: "Blacklist" },
+  { key: "white",       label: "Whitelist" },
   { key: "regex_black", label: "Regex Block" },
   { key: "regex_white", label: "Regex Allow" },
 ] as const;
 
 const SUGGESTED_LISTS = [
-  {
-    name: "StevenBlack",
-    url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
-  },
-  {
-    name: "Disconnect.me",
-    url: "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt",
-  },
-  { name: "abuse.ch", url: "https://urlhaus.abuse.ch/downloads/hostfile/" },
-  {
-    name: "NoTrack",
-    url: "https://gitlab.com/quidsup/notrack-blocklists/raw/master/notrack-blocklist.txt",
-  },
+  { name: "StevenBlack",  url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts" },
+  { name: "Disconnect.me", url: "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt" },
+  { name: "abuse.ch",     url: "https://urlhaus.abuse.ch/downloads/hostfile/" },
+  { name: "NoTrack",      url: "https://gitlab.com/quidsup/notrack-blocklists/raw/master/notrack-blocklist.txt" },
 ];
 
 const ADLIST_LABELS: Record<string, string> = {
@@ -294,9 +217,7 @@ const ADLIST_LABELS: Record<string, string> = {
   comment: "Comment",
   enabled: "Enabled",
 };
-const ADLIST_ACCESSORS: Partial<
-  Record<string, (e: Adlist) => string | number>
-> = {
+const ADLIST_ACCESSORS: Partial<Record<string, (e: Adlist) => string | number>> = {
   address: (e) => e.address,
   comment: (e) => e.comment || "",
   enabled: (e) => e.enabled,
@@ -305,42 +226,32 @@ const ADLIST_ACCESSORS: Partial<
 export default defineComponent({
   name: "BlockListsView",
   components: {
-    IonPage,
-    IonContent,
-    IonIcon,
-    PageHeader,
-    EmptyState,
-    SortableHeader,
-    InstanceTabBar,
-    AddDomainForm,
-    DomainListTable,
+    IonPage, IonContent, IonIcon,
+    PageHeader, EmptyState, SortableHeader,
+    InstanceTabBar, AddDomainForm, DomainListTable,
   },
 
   data() {
     const { copyToClipboard } = useClipboard();
     return {
       selectedInstanceId: null as string | null,
-      activeTab: "adlists" as string,
-      isLoading: false as boolean,
-      _rawAdlists: markRaw([] as Adlist[]),
-      sortedAdlists: [] as Adlist[],
-      adlistSortKey: "" as string,
-      _domainList: markRaw([] as DomainEntry[]),
-      domainSearch: "" as string,
-      newAdlistUrl: "" as string,
-      newAdlistComment: "" as string,
-      counts: {} as Record<string, number>,
-      adlistSort: markRaw(useMultiSort()) as MultiSort,
+      activeTab:          "adlists" as string,
+      isLoading:          false as boolean,
+      rawAdlists:        markRaw([] as Adlist[]),
+      sortedAdlists:      [] as Adlist[],
+      adlistSortKey:      "" as string,
+      domainList:        markRaw([] as DomainEntry[]),
+      domainSearch:       "" as string,
+      newAdlistUrl:       "" as string,
+      newAdlistComment:   "" as string,
+      counts:             {} as Record<string, number>,
+      adlistSort:         markRaw(useMultiSort()) as MultiSort,
       ADLIST_LABELS,
       LIST_TABS,
       SUGGESTED_LISTS,
       copyToClipboard,
-      shieldOutline,
-      addOutline,
-      cloudDownloadOutline,
-      refreshOutline,
-      copyOutline,
-      trashOutline,
+      shieldOutline, addOutline, cloudDownloadOutline,
+      refreshOutline, copyOutline, trashOutline,
     };
   },
 
@@ -366,6 +277,8 @@ export default defineComponent({
         ? "e.g. .*\\.ads\\..*"
         : "e.g. ads.example.com";
     },
+
+
   },
 
   mounted() {
@@ -380,10 +293,8 @@ export default defineComponent({
   methods: {
     // ── Adlist sort ───────────────────────────────────────────────────────────
     onAdlistSortChanged(): void {
-      this.adlistSortKey = this.adlistSort.levels
-        .map((l) => `${l.col}:${l.dir}`)
-        .join(",");
-      this._rebuildAdlists();
+      this.adlistSortKey = this.adlistSort.levels.map((l) => `${l.col}:${l.dir}`).join(",");
+      this.rebuildAdlists();
     },
 
     onAdlistSortRemove(col: string): void {
@@ -396,14 +307,11 @@ export default defineComponent({
       this.onAdlistSortChanged();
     },
 
-    _rebuildAdlists(): void {
+    rebuildAdlists(): void {
       if (this.adlistSort.levels.length) {
-        this.sortedAdlists = this.adlistSort.apply(
-          this._rawAdlists as Adlist[],
-          ADLIST_ACCESSORS,
-        );
+        this.sortedAdlists = this.adlistSort.apply(this.rawAdlists as Adlist[], ADLIST_ACCESSORS);
       } else {
-        this.sortedAdlists = [...(this._rawAdlists as Adlist[])];
+        this.sortedAdlists = [...(this.rawAdlists as Adlist[])];
       }
     },
 
@@ -413,7 +321,7 @@ export default defineComponent({
     },
 
     switchTab(key: string): void {
-      this.activeTab = key;
+      this.activeTab    = key;
       this.domainSearch = "";
       key === "adlists" ? void this.loadAdlists() : void this.loadDomainList();
     },
@@ -423,13 +331,11 @@ export default defineComponent({
       this.isLoading = true;
       try {
         const fetched = await PiholeApiService.getAdlists(this.currentInstance);
-        this._rawAdlists = markRaw(fetched);
+        this.rawAdlists = markRaw(fetched);
         this.counts = { ...this.counts, adlists: fetched.length };
-        this._rebuildAdlists();
+        this.rebuildAdlists();
       } catch (err) {
-        useNotificationStore().error(
-          `Failed to load adlists: ${(err as Error).message}`,
-        );
+        useNotificationStore().error(`Failed to load adlists: ${(err as Error).message}`);
       } finally {
         this.isLoading = false;
       }
@@ -443,12 +349,10 @@ export default defineComponent({
           this.currentInstance,
           this.activeTab as DomainListType,
         );
-        this._domainList = markRaw(raw);
+        this.domainList = markRaw(raw);
         this.counts = { ...this.counts, [this.activeTab]: raw.length };
       } catch (err) {
-        useNotificationStore().error(
-          `Failed to load list: ${(err as Error).message}`,
-        );
+        useNotificationStore().error(`Failed to load list: ${(err as Error).message}`);
       } finally {
         this.isLoading = false;
       }
@@ -463,7 +367,7 @@ export default defineComponent({
           this.newAdlistComment,
         );
         useNotificationStore().success("Adlist added");
-        this.newAdlistUrl = "";
+        this.newAdlistUrl     = "";
         this.newAdlistComment = "";
         await this.loadAdlists();
       } catch (err) {
@@ -491,9 +395,7 @@ export default defineComponent({
           domain,
           comment,
         );
-        useNotificationStore().success(
-          `Added to ${this.currentTabLabel}: ${domain}`,
-        );
+        useNotificationStore().success(`Added to ${this.currentTabLabel}: ${domain}`);
         await this.loadDomainList();
       } catch (err) {
         useNotificationStore().error(`Failed: ${(err as Error).message}`);
@@ -519,9 +421,7 @@ export default defineComponent({
       if (!this.currentInstance) return;
       try {
         await PiholeApiService.updateGravity(this.currentInstance);
-        useNotificationStore().info(
-          "Gravity update triggered (runs in background)",
-        );
+        useNotificationStore().info("Gravity update triggered (runs in background)");
       } catch (err) {
         useNotificationStore().error(`Failed: ${(err as Error).message}`);
       }
@@ -554,15 +454,8 @@ export default defineComponent({
   transition: all 0.15s;
   font-family: var(--font-sans);
 }
-.list-tab:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
-}
-.list-tab.active {
-  background: var(--bg-base);
-  color: var(--accent-cyan);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
+.list-tab:hover  { background: var(--bg-hover); color: var(--text-primary); }
+.list-tab.active { background: var(--bg-base); color: var(--accent-cyan); box-shadow: 0 1px 4px rgba(0,0,0,0.3); }
 .tab-count {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -571,8 +464,6 @@ export default defineComponent({
   border-radius: 8px;
   color: var(--text-muted);
 }
-.suggested-lists {
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
-}
+.suggested-lists { padding-top: 8px; border-top: 1px solid var(--border-subtle); }
+
 </style>

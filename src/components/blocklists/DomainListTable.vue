@@ -37,7 +37,7 @@
     <table v-else class="data-table">
       <thead>
         <tr>
-          <SortableHeader col="domain"  label="Domain"  :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+          <SortableHeader col="domain" label="Domain"  :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
           <SortableHeader col="comment" label="Comment" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
           <SortableHeader col="date"    label="Added"   :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
           <th>Actions</th>
@@ -112,8 +112,8 @@ export default defineComponent({
     return {
       sort:             markRaw(useMultiSort()) as MultiSort,
       sortKey:          "" as string,
-      _rawEntries:      markRaw([] as DomainEntry[]),
-      _searchQuery:     "" as string,   // internal copy, avoids prop-watch lag
+      rawEntries:      markRaw([] as DomainEntry[]),
+      localSearchQuery:     "" as string,   // internal copy, avoids prop-watch lag
       displayedEntries: [] as DomainEntry[],
       totalDisplayed:   0  as number,
       fmtDate,
@@ -131,25 +131,25 @@ export default defineComponent({
       handler(newEntries: DomainEntry[]) {
         // entries prop may already be markRaw from the parent; markRaw again
         // is a no-op on an already-raw value but safe to call regardless.
-        this._rawEntries = markRaw(newEntries as DomainEntry[]);
-        this._rebuild();
+        this.rawEntries = markRaw(newEntries as DomainEntry[]);
+        this.rebuild();
       },
     },
     // Sync search query from parent (v-model:search-query)
     searchQuery(val: string) {
-      this._searchQuery = val;
-      this._rebuild();
+      this.localSearchQuery = val;
+      this.rebuild();
     },
     sortKey() {
-      this._rebuild();
+      this.rebuild();
     },
   },
 
   methods: {
     onSearch(val: string): void {
-      this._searchQuery = val;
+      this.localSearchQuery = val;
       this.$emit("update:searchQuery", val);
-      this._rebuild();
+      this.rebuild();
     },
 
     onSortChanged(): void {
@@ -166,11 +166,11 @@ export default defineComponent({
       this.onSortChanged();
     },
 
-    _rebuild(): void {
-      const q = this._searchQuery.toLowerCase();
+    rebuild(): void {
+      const q = this.localSearchQuery.toLowerCase();
 
       // 1. Filter on raw plain objects — no Proxy overhead
-      let result: DomainEntry[] = this._rawEntries as DomainEntry[];
+      let result: DomainEntry[] = this.rawEntries as DomainEntry[];
       if (q) {
         result = result.filter((e) => e.domain.toLowerCase().includes(q));
       }

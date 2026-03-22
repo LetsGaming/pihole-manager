@@ -55,7 +55,11 @@ const STUBS = {
   },
   StatCard: {
     template: '<div class="stat-card">{{label}}:{{value}}</div>',
-    props: ["label", "value", "accent"],
+    props: ["label", "value", "accent", "sub", "icon"],
+  },
+  StatsOverviewCards: {
+    template: "<div />",
+    props: ["summary", "aggregateMode"],
   },
   InstanceCard: {
     template: '<div class="instance-card" />',

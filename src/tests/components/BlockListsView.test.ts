@@ -156,7 +156,7 @@ describe("BlockListsView", () => {
       global: { plugins: [pinia], stubs: STUBS },
     });
     await new Promise((r) => setTimeout(r, 100));
-    expect(w.vm.adlists.length).toBeGreaterThan(0);
+    expect(w.vm.sortedAdlists.length).toBeGreaterThan(0);
   });
 
   it("activeTab starts as adlists", () => {

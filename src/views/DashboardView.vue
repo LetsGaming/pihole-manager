@@ -239,20 +239,17 @@ export default defineComponent({
       void this.instanceStore.refreshAll();
     },
 
-    onToggleBlocking(id: string, enable: boolean): void {
-      const { toggleBlocking } = useBlockingControl();
-      void toggleBlocking(id, enable);
+    onToggleBlocking(id: string, enable: boolean): Promise<void> {
+      return useBlockingControl().toggleBlocking(id, enable);
     },
 
-    onEnableAll(): void {
-      const { enableAll } = useBlockingControl();
-      void enableAll();
+    onEnableAll(): Promise<void> {
+      return useBlockingControl().enableAll();
     },
 
-    onDisableAll(secs: number): void {
+    onDisableAll(secs: number): Promise<void> {
       this.showDisableModal = false;
-      const { disableAll } = useBlockingControl();
-      void disableAll(secs);
+      return useBlockingControl().disableAll(secs);
     },
   },
 });

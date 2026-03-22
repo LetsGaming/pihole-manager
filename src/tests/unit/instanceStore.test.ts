@@ -97,10 +97,13 @@ describe("instanceStore.addInstance", () => {
     expect(saved.instances).toHaveLength(1);
   });
 
-  it("initialises loading[id] = false", () => {
+  it("initialises loading[id] = false after refresh settles", async () => {
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
+    // addInstance fires void refreshInstance() asynchronously;
+    // wait for it to complete before checking the loading flag.
+    await store.refreshInstance(id);
     expect(store.loading[id]).toBe(false);
   });
 
@@ -230,12 +233,16 @@ describe("instanceStore.refreshInstance", () => {
   });
 
   it("keeps status as-is on first failure (resilience)", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
+    // Add instance while mock still succeeds so auto-refresh in addInstance passes.
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
+    await store.refreshInstance(id); // let the auto-refresh settle (succeeds)
+
+    // Now switch to rejecting and do a single explicit failure
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
     await store.refreshInstance(id);
-    // One failure — below OFFLINE_THRESHOLD=2 — status stays unknown
+    // One failure — below OFFLINE_THRESHOLD=2 — status stays online (was set above)
     expect(store.instances[0].status).not.toBe("offline");
     expect(store.errors[id]).toBeTruthy();
   });

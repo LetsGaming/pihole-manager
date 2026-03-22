@@ -6,15 +6,15 @@
     <div class="flex gap-2" style="flex-wrap: wrap">
       <input
         class="field-input"
-        style="flex: 1; min-width: 200px"
         v-model="domain"
+          style="flex: 1; min-width: 200px"
         :placeholder="placeholder"
         @keyup.enter="submit"
       />
       <input
         class="field-input"
-        style="width: 200px"
         v-model="comment"
+          style="width: 200px"
         placeholder="Comment (optional)"
       />
       <button

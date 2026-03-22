@@ -54,10 +54,10 @@
         <div class="log-container">
           <div class="log-header-row">
             <SortableHeader tag="div" col="timestamp" label="Time"   :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-            <SortableHeader tag="div" col="domain"    label="Domain" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-            <SortableHeader tag="div" col="client"    label="Client" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-            <SortableHeader tag="div" col="type"      label="Type"   :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-            <SortableHeader tag="div" col="status"    label="Status" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+            <SortableHeader tag="div" col="domain" label="Domain" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+            <SortableHeader tag="div" col="client" label="Client" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+            <SortableHeader tag="div" col="type" label="Type"   :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+            <SortableHeader tag="div" col="status" label="Status" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
             <div class="log-header-actions">Actions</div>
           </div>
 
@@ -155,9 +155,9 @@ export default defineComponent({
       // ── Entry data — stored raw, never deep-proxied ─────────────────────────
       // Keeping 100-500 entry objects outside Vue's Proxy system eliminates
       // the per-property tracking overhead that caused the sort delay.
-      _rawEntries: markRaw([] as EnrichedQueryEntry[]),
+      rawEntries: markRaw([] as EnrichedQueryEntry[]),
 
-      // ── Derived display data — also raw, written by _rebuildView() ─────────
+      // ── Derived display data — also raw, written by rebuildView() ─────────
       // pagedEntries and totalFiltered/totalPages are plain reactive scalars;
       // the actual page slice is stored as a shallowRef (tracks the array
       // reference, not its contents) so the template re-renders when we
@@ -180,9 +180,9 @@ export default defineComponent({
 
   watch: {
     // Any filter or sort change → rebuild the view immediately
-    statusFilter() { this._rebuildView(); },
-    searchQuery()  { this._rebuildView(); },
-    sortKey()      { this._rebuildView(); },
+    statusFilter() { this.rebuildView(); },
+    searchQuery()  { this.rebuildView(); },
+    sortKey()      { this.rebuildView(); },
   },
 
   mounted() {
@@ -217,12 +217,12 @@ export default defineComponent({
 
     // ── View rebuild — runs filter + sort + paginate on raw data ─────────────
 
-    _rebuildView(resetPage = false): void {
+    rebuildView(resetPage = false): void {
       const q = this.searchQuery.toLowerCase();
       const sf = this.statusFilter;
 
       // 1. Filter — runs on plain objects, no Proxy traps
-      let result = this._rawEntries as EnrichedQueryEntry[];
+      let result = this.rawEntries as EnrichedQueryEntry[];
       if (sf !== "all" || q) {
         result = result.filter((e) => {
           if (sf !== "all" && e.status !== sf) return false;
@@ -255,8 +255,8 @@ export default defineComponent({
     // ── Data fetch ───────────────────────────────────────────────────────────
 
     clearEntries(): void {
-      this._rawEntries = markRaw([]);
-      this._rebuildView(true);
+      this.rawEntries = markRaw([]);
+      this.rebuildView(true);
     },
 
     async fetchLog(): Promise<void> {
@@ -293,8 +293,8 @@ export default defineComponent({
           combined[i]._key = `${combined[i]._instanceId}-${combined[i].timestamp}-${combined[i].domain}-${i}`;
         }
 
-        this._rawEntries = markRaw(combined);
-        this._rebuildView(true);
+        this.rawEntries = markRaw(combined);
+        this.rebuildView(true);
       } catch (err) {
         useNotificationStore().error(`Failed to fetch log: ${(err as Error).message}`);
       } finally {
@@ -306,8 +306,8 @@ export default defineComponent({
 
     changeInstance(id: string): void {
       this.selectedInstanceId = id;
-      this._rawEntries = markRaw([]);
-      this._rebuildView(true);
+      this.rawEntries = markRaw([]);
+      this.rebuildView(true);
       void this.fetchLog();
     },
 

@@ -29,8 +29,8 @@ export default defineComponent({
     accent: { type: String as PropType<string | null>, default: null },
     /** Optional sub-label below the number */
     sub: { type: String as PropType<string | null>, default: null },
-    /** Optional ionicon for the card icon slot */
-    icon: { type: Object as PropType<string | null>, default: null },
+    /** Optional ionicon — accepts the icon object or resolved SVG string */
+    icon: { type: [Object, String] as PropType<object | string | null>, default: null },
   },
 });
 </script>
