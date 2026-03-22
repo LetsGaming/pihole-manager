@@ -30,31 +30,38 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, onMounted, onBeforeUnmount } from 'vue';
-import { IonPage, IonContent, IonIcon } from '@ionic/vue';
-import { refreshOutline, hardwareChipOutline } from 'ionicons/icons';
+import { defineComponent, reactive, onMounted, onBeforeUnmount } from "vue";
+import { IonPage, IonContent, IonIcon } from "@ionic/vue";
+import { refreshOutline, hardwareChipOutline } from "ionicons/icons";
 
-import PageHeader    from '@/components/ui/PageHeader.vue';
-import EmptyState    from '@/components/ui/EmptyState.vue';
-import HardwareCard  from '@/components/hardware/HardwareCard.vue';
+import PageHeader from "@/components/ui/PageHeader.vue";
+import EmptyState from "@/components/ui/EmptyState.vue";
+import HardwareCard from "@/components/hardware/HardwareCard.vue";
 
-import { useInstanceStore }    from '@/stores/instanceStore';
-import { useNotificationStore } from '@/stores/notificationStore';
-import HardwareService         from '@/services/hardwareService';
-import type { HardwareInfo }   from '@/types/hardware';
+import { useInstanceStore } from "@/stores/instanceStore";
+import { useNotificationStore } from "@/stores/notificationStore";
+import HardwareService from "@/services/hardwareService";
+import type { HardwareInfo } from "@/types/hardware";
 
 const REFRESH_INTERVAL_MS = 15_000;
 
 export default defineComponent({
-  name: 'HardwareView',
-  components: { IonPage, IonContent, IonIcon, PageHeader, EmptyState, HardwareCard },
+  name: "HardwareView",
+  components: {
+    IonPage,
+    IonContent,
+    IonIcon,
+    PageHeader,
+    EmptyState,
+    HardwareCard,
+  },
 
   setup() {
     const instanceStore = useInstanceStore();
     const notifications = useNotificationStore();
 
-    const hwData:  Record<string, HardwareInfo> = reactive({});
-    const loading: Record<string, boolean>      = reactive({});
+    const hwData: Record<string, HardwareInfo> = reactive({});
+    const loading: Record<string, boolean> = reactive({});
     let refreshHandle: ReturnType<typeof setInterval> | null = null;
 
     async function fetchHardware(inst: (typeof instanceStore.instances)[0]) {
@@ -62,17 +69,33 @@ export default defineComponent({
       try {
         hwData[inst.id] = await HardwareService.getHardwareInfo(inst);
       } catch (err) {
-        notifications.error(`Hardware fetch failed for ${inst.name}: ${(err as Error).message}`);
+        notifications.error(
+          `Hardware fetch failed for ${inst.name}: ${(err as Error).message}`,
+        );
         // Set an empty record so the card shows "limited data" rather than "waiting…"
         if (!hwData[inst.id]) {
           hwData[inst.id] = {
-            cpuLoad: null, cpuTemp: null, cpuModel: null, cpuCores: null,
-            memTotal: null, memUsed: null, memFree: null, memPercent: null,
-            diskTotal: null, diskUsed: null, diskPercent: null,
-            hostname: null, ipAddress: null, interface: null,
-            uptimeSeconds: null, uptimeFormatted: null,
-            piholeVersion: null, ftlVersion: null, webVersion: null,
-            domainsBlocked: null, gravityLastUpdate: null,
+            cpuLoad: null,
+            cpuTemp: null,
+            cpuModel: null,
+            cpuCores: null,
+            memTotal: null,
+            memUsed: null,
+            memFree: null,
+            memPercent: null,
+            diskTotal: null,
+            diskUsed: null,
+            diskPercent: null,
+            hostname: null,
+            ipAddress: null,
+            interface: null,
+            uptimeSeconds: null,
+            uptimeFormatted: null,
+            piholeVersion: null,
+            ftlVersion: null,
+            webVersion: null,
+            domainsBlocked: null,
+            gravityLastUpdate: null,
           };
         }
       } finally {
@@ -94,7 +117,15 @@ export default defineComponent({
       if (refreshHandle !== null) clearInterval(refreshHandle);
     });
 
-    return { instanceStore, hwData, loading, refreshAll, fetchHardware, refreshOutline, hardwareChipOutline };
+    return {
+      instanceStore,
+      hwData,
+      loading,
+      refreshAll,
+      fetchHardware,
+      refreshOutline,
+      hardwareChipOutline,
+    };
   },
 });
 </script>
@@ -105,5 +136,9 @@ export default defineComponent({
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 20px;
 }
-@media (max-width: 600px) { .hw-instances-grid { grid-template-columns: 1fr; } }
+@media (max-width: 600px) {
+  .hw-instances-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

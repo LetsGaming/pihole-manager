@@ -37,4 +37,4 @@ export interface HardwareInfo {
   gravityLastUpdate: Date | null;
 }
 
-export type SeverityLevel = 'normal' | 'warn' | 'crit';
+export type SeverityLevel = "normal" | "warn" | "crit";

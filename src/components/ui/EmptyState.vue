@@ -8,15 +8,15 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
-import { IonIcon } from '@ionic/vue';
+import { defineComponent } from "vue";
+import { IonIcon } from "@ionic/vue";
 
 export default defineComponent({
-  name: 'EmptyState',
+  name: "EmptyState",
   components: { IonIcon },
   props: {
-    icon:     { type: String, default: null },
-    title:    { type: String, required: true },
+    icon: { type: String, default: null },
+    title: { type: String, required: true },
     subtitle: { type: String, default: null },
   },
 });

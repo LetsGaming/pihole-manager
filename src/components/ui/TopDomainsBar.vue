@@ -15,17 +15,17 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent } from "vue";
 
 export default defineComponent({
-  name: 'TopDomainsBar',
+  name: "TopDomainsBar",
   props: {
-    domain:  { type: String,  required: true },
-    count:   { type: Number,  required: true },
+    domain: { type: String, required: true },
+    count: { type: Number, required: true },
     /** Width percentage (0–100) */
-    width:   { type: Number,  required: true },
+    width: { type: Number, required: true },
     /** CSS modifier class: 'blocked' | 'green' | '' */
-    variant: { type: String,  default: '' },
+    variant: { type: String, default: "" },
   },
 });
 </script>

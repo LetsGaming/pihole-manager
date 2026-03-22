@@ -1,7 +1,7 @@
 // ─── Instance ─────────────────────────────────────────────────────────────────
 
-export type InstanceStatus = 'online' | 'offline' | 'unknown';
-export type ApiVersion = 'v5' | 'v6';
+export type InstanceStatus = "online" | "offline" | "unknown";
+export type ApiVersion = "v5" | "v6";
 
 export interface PiholeInstance {
   id: string;
@@ -18,5 +18,10 @@ export interface PiholeInstance {
   addedAt: string; // ISO date string
 }
 
-export type NewInstanceConfig = Omit<PiholeInstance, 'id' | 'status' | 'addedAt'>;
-export type UpdateInstanceConfig = Partial<Pick<PiholeInstance, 'name' | 'url' | 'apiToken' | 'apiVersion'>>;
+export type NewInstanceConfig = Omit<
+  PiholeInstance,
+  "id" | "status" | "addedAt"
+>;
+export type UpdateInstanceConfig = Partial<
+  Pick<PiholeInstance, "name" | "url" | "apiToken" | "apiVersion">
+>;

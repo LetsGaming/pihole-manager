@@ -1,6 +1,6 @@
 // ─── Summary / Status ─────────────────────────────────────────────────────────
 
-export type BlockingStatus = 'enabled' | 'disabled';
+export type BlockingStatus = "enabled" | "disabled";
 
 export interface PiholeSummary {
   status: BlockingStatus;
@@ -20,11 +20,11 @@ export interface PiholeSummary {
 
 // ─── Query Log ────────────────────────────────────────────────────────────────
 
-export type QueryStatus = 'blocked' | 'allowed' | 'cached' | 'unknown';
+export type QueryStatus = "blocked" | "allowed" | "cached" | "unknown";
 
 export interface QueryEntry {
   timestamp: number; // Unix ms
-  type: string;      // e.g. "A", "AAAA"
+  type: string; // e.g. "A", "AAAA"
   domain: string;
   client: string;
   statusCode: number;
@@ -42,7 +42,7 @@ export interface EnrichedQueryEntry extends QueryEntry {
 
 // ─── Lists ────────────────────────────────────────────────────────────────────
 
-export type DomainListType = 'black' | 'white' | 'regex_black' | 'regex_white';
+export type DomainListType = "black" | "white" | "regex_black" | "regex_white";
 
 export interface Adlist {
   id: number;

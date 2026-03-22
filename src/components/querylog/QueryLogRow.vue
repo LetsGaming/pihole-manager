@@ -5,10 +5,16 @@
     <span class="log-client">{{ entry.client }}</span>
     <span class="log-type text-xs text-muted">{{ entry.type }}</span>
     <span
-      :class="entry.status === 'blocked' ? 'log-status-blocked' : entry.status === 'cached' ? 'log-status-cached' : 'log-status-allowed'"
+      :class="
+        entry.status === 'blocked'
+          ? 'log-status-blocked'
+          : entry.status === 'cached'
+            ? 'log-status-cached'
+            : 'log-status-allowed'
+      "
       :title="entry.rawStatus ?? entry.status"
     >
-      {{ entry.rawStatus ? entry.rawStatus.replace(/_/g, ' ') : entry.status }}
+      {{ entry.rawStatus ? entry.rawStatus.replace(/_/g, " ") : entry.status }}
     </span>
     <div class="log-actions">
       <button
@@ -17,7 +23,10 @@
         title="Whitelist domain"
         @click="$emit('whitelist', entry.domain, entry._instanceId)"
       >
-        <ion-icon :icon="checkmarkCircleOutline" style="color:var(--accent-green)" />
+        <ion-icon
+          :icon="checkmarkCircleOutline"
+          style="color: var(--accent-green)"
+        />
       </button>
       <button
         v-else
@@ -25,7 +34,7 @@
         title="Blacklist domain"
         @click="$emit('blacklist', entry.domain, entry._instanceId)"
       >
-        <ion-icon :icon="banOutline" style="color:var(--accent-red)" />
+        <ion-icon :icon="banOutline" style="color: var(--accent-red)" />
       </button>
       <button
         class="btn btn-ghost btn-sm btn-icon"
@@ -39,22 +48,26 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
-import type { PropType } from 'vue';
-import { IonIcon } from '@ionic/vue';
-import { checkmarkCircleOutline, banOutline, copyOutline } from 'ionicons/icons';
-import type { EnrichedQueryEntry } from '@/types/api';
-import { useFormatting } from '@/composables/useFormatting';
+import { defineComponent } from "vue";
+import type { PropType } from "vue";
+import { IonIcon } from "@ionic/vue";
+import {
+  checkmarkCircleOutline,
+  banOutline,
+  copyOutline,
+} from "ionicons/icons";
+import type { EnrichedQueryEntry } from "@/types/api";
+import { useFormatting } from "@/composables/useFormatting";
 
 export default defineComponent({
-  name: 'QueryLogRow',
+  name: "QueryLogRow",
   components: { IonIcon },
 
   props: {
     entry: { type: Object as PropType<EnrichedQueryEntry>, required: true },
   },
 
-  emits: ['whitelist', 'blacklist', 'copy'],
+  emits: ["whitelist", "blacklist", "copy"],
 
   setup() {
     const { fmtTime } = useFormatting();

@@ -2,15 +2,19 @@
   <ion-modal :is-open="isOpen" @did-dismiss="$emit('close')">
     <ion-header>
       <ion-toolbar>
-        <ion-title style="font-family:var(--font-mono);font-size:16px">Disable All Blocking</ion-title>
+        <ion-title style="font-family: var(--font-mono); font-size: 16px"
+          >Disable All Blocking</ion-title
+        >
         <ion-buttons slot="end">
           <ion-button @click="$emit('close')">Cancel</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-header>
     <ion-content class="page-content">
-      <p style="color:var(--text-secondary);margin-bottom:20px">
-        This will disable ad blocking on all {{ onlineCount }} online instance{{ onlineCount !== 1 ? 's' : '' }}.
+      <p style="color: var(--text-secondary); margin-bottom: 20px">
+        This will disable ad blocking on all {{ onlineCount }} online instance{{
+          onlineCount !== 1 ? "s" : ""
+        }}.
       </p>
       <div class="field-group">
         <label class="field-label">Duration</label>
@@ -33,27 +37,44 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from 'vue';
+import { defineComponent, ref } from "vue";
 import {
-  IonModal, IonHeader, IonToolbar, IonTitle,
-  IonButtons, IonButton, IonContent, IonIcon,
-} from '@ionic/vue';
-import { shieldOutline } from 'ionicons/icons';
+  IonModal,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
+  IonButton,
+  IonContent,
+  IonIcon,
+} from "@ionic/vue";
+import { shieldOutline } from "ionicons/icons";
 
 export default defineComponent({
-  name: 'DisableBlockingModal',
-  components: { IonModal, IonHeader, IonToolbar, IonTitle, IonButtons, IonButton, IonContent, IonIcon },
-
-  props: {
-    isOpen:      { type: Boolean, required: true },
-    onlineCount: { type: Number,  default: 0 },
+  name: "DisableBlockingModal",
+  components: {
+    IonModal,
+    IonHeader,
+    IonToolbar,
+    IonTitle,
+    IonButtons,
+    IonButton,
+    IonContent,
+    IonIcon,
   },
 
-  emits: ['close', 'confirm'],
+  props: {
+    isOpen: { type: Boolean, required: true },
+    onlineCount: { type: Number, default: 0 },
+  },
+
+  emits: ["close", "confirm"],
 
   setup(_, { emit }) {
     const duration = ref(0);
-    function confirm() { emit('confirm', duration.value); }
+    function confirm() {
+      emit("confirm", duration.value);
+    }
     return { duration, confirm, shieldOutline };
   },
 });

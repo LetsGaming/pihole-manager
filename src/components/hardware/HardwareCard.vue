@@ -4,11 +4,17 @@
     <div class="hw-card-header">
       <div class="flex items-center gap-2">
         <div class="instance-status-dot" :class="`status-${instance.status}`" />
-        <span style="font-weight:600;font-size:15px">{{ instance.name }}</span>
+        <span style="font-weight: 600; font-size: 15px">{{
+          instance.name
+        }}</span>
       </div>
       <div class="flex items-center gap-2">
         <span class="text-xs text-muted text-mono">{{ instance.url }}</span>
-        <button class="btn btn-ghost btn-sm btn-icon" title="Refresh" @click="$emit('refresh')">
+        <button
+          class="btn btn-ghost btn-sm btn-icon"
+          title="Refresh"
+          @click="$emit('refresh')"
+        >
           <ion-icon :icon="refreshOutline" />
         </button>
       </div>
@@ -16,7 +22,12 @@
 
     <!-- Loading -->
     <div v-if="loading" class="hw-loading">
-      <div v-for="i in 4" :key="i" class="skeleton" style="height:60px;margin-bottom:10px" />
+      <div
+        v-for="i in 4"
+        :key="i"
+        class="skeleton"
+        style="height: 60px; margin-bottom: 10px"
+      />
     </div>
 
     <!-- Offline -->
@@ -26,7 +37,11 @@
     </div>
 
     <!-- No data yet -->
-    <div v-else-if="!hwData" class="ioc-offline" style="color:var(--text-muted)">
+    <div
+      v-else-if="!hwData"
+      class="ioc-offline"
+      style="color: var(--text-muted)"
+    >
       <ion-icon :icon="refreshOutline" />
       Waiting for data…
     </div>
@@ -41,7 +56,11 @@
           :bar-percent="hwData.cpuLoad"
           :value-color="loadColor(hwData.cpuLoad)"
           :severity-class="hwService.severityClass(hwData.cpuLoad)"
-          :sub="hwData.cpuCores ? `${hwData.cpuCores} core${hwData.cpuCores > 1 ? 's' : ''}` : undefined"
+          :sub="
+            hwData.cpuCores
+              ? `${hwData.cpuCores} core${hwData.cpuCores > 1 ? 's' : ''}`
+              : undefined
+          "
         />
         <MetricGauge
           v-if="hwData.cpuTemp != null"
@@ -73,46 +92,84 @@
 
       <!-- Info rows — only rendered when non-null -->
       <div class="hw-info-table mt-3">
-        <div v-if="hwData.hostname" class="hw-info-row"><span class="hw-info-label">Hostname</span> <span class="hw-info-value mono">{{ hwData.hostname }}</span></div>
-        <div v-if="hwData.ipAddress" class="hw-info-row"><span class="hw-info-label">IP Address</span> <span class="hw-info-value mono">{{ hwData.ipAddress }}</span></div>
-        <div v-if="hwData.uptimeFormatted" class="hw-info-row"><span class="hw-info-label">Uptime</span> <span class="hw-info-value">{{ hwData.uptimeFormatted }}</span></div>
-        <div v-if="hwData.cpuModel" class="hw-info-row"><span class="hw-info-label">CPU Model</span> <span class="hw-info-value">{{ hwData.cpuModel }}</span></div>
-        <div v-if="hwData.piholeVersion" class="hw-info-row"><span class="hw-info-label">Pi-hole</span> <span class="hw-info-value mono badge badge-cyan">{{ hwData.piholeVersion }}</span></div>
-        <div v-if="hwData.ftlVersion" class="hw-info-row"><span class="hw-info-label">FTL</span> <span class="hw-info-value mono">{{ hwData.ftlVersion }}</span></div>
-        <div v-if="hwData.webVersion" class="hw-info-row"><span class="hw-info-label">Web</span> <span class="hw-info-value mono">{{ hwData.webVersion }}</span></div>
-        <div v-if="hwData.domainsBlocked" class="hw-info-row"><span class="hw-info-label">Domains Blocked</span> <span class="hw-info-value mono">{{ Number(hwData.domainsBlocked).toLocaleString() }}</span></div>
-        <div v-if="hwData.gravityLastUpdate" class="hw-info-row"><span class="hw-info-label">Gravity Updated</span><span class="hw-info-value">{{ fmtDateTime(hwData.gravityLastUpdate) }}</span></div>
+        <div v-if="hwData.hostname" class="hw-info-row">
+          <span class="hw-info-label">Hostname</span>
+          <span class="hw-info-value mono">{{ hwData.hostname }}</span>
+        </div>
+        <div v-if="hwData.ipAddress" class="hw-info-row">
+          <span class="hw-info-label">IP Address</span>
+          <span class="hw-info-value mono">{{ hwData.ipAddress }}</span>
+        </div>
+        <div v-if="hwData.uptimeFormatted" class="hw-info-row">
+          <span class="hw-info-label">Uptime</span>
+          <span class="hw-info-value">{{ hwData.uptimeFormatted }}</span>
+        </div>
+        <div v-if="hwData.cpuModel" class="hw-info-row">
+          <span class="hw-info-label">CPU Model</span>
+          <span class="hw-info-value">{{ hwData.cpuModel }}</span>
+        </div>
+        <div v-if="hwData.piholeVersion" class="hw-info-row">
+          <span class="hw-info-label">Pi-hole</span>
+          <span class="hw-info-value mono badge badge-cyan">{{
+            hwData.piholeVersion
+          }}</span>
+        </div>
+        <div v-if="hwData.ftlVersion" class="hw-info-row">
+          <span class="hw-info-label">FTL</span>
+          <span class="hw-info-value mono">{{ hwData.ftlVersion }}</span>
+        </div>
+        <div v-if="hwData.webVersion" class="hw-info-row">
+          <span class="hw-info-label">Web</span>
+          <span class="hw-info-value mono">{{ hwData.webVersion }}</span>
+        </div>
+        <div v-if="hwData.domainsBlocked" class="hw-info-row">
+          <span class="hw-info-label">Domains Blocked</span>
+          <span class="hw-info-value mono">{{
+            Number(hwData.domainsBlocked).toLocaleString()
+          }}</span>
+        </div>
+        <div v-if="hwData.gravityLastUpdate" class="hw-info-row">
+          <span class="hw-info-label">Gravity Updated</span
+          ><span class="hw-info-value">{{
+            fmtDateTime(hwData.gravityLastUpdate)
+          }}</span>
+        </div>
       </div>
 
-      <div v-if="noData" class="text-muted text-sm" style="padding:12px;text-align:center">
-        Limited hardware data available — normal for VMs or restricted environments.
+      <div
+        v-if="noData"
+        class="text-muted text-sm"
+        style="padding: 12px; text-align: center"
+      >
+        Limited hardware data available — normal for VMs or restricted
+        environments.
       </div>
     </template>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from 'vue';
-import type { PropType } from 'vue';
-import { IonIcon } from '@ionic/vue';
-import { warningOutline, refreshOutline } from 'ionicons/icons';
-import MetricGauge from '@/components/ui/MetricGauge.vue';
-import HardwareService from '@/services/hardwareService';
-import type { PiholeInstance } from '@/types/instance';
-import type { HardwareInfo } from '@/types/hardware';
-import { useFormatting } from '@/composables/useFormatting';
+import { defineComponent, computed } from "vue";
+import type { PropType } from "vue";
+import { IonIcon } from "@ionic/vue";
+import { warningOutline, refreshOutline } from "ionicons/icons";
+import MetricGauge from "@/components/ui/MetricGauge.vue";
+import HardwareService from "@/services/hardwareService";
+import type { PiholeInstance } from "@/types/instance";
+import type { HardwareInfo } from "@/types/hardware";
+import { useFormatting } from "@/composables/useFormatting";
 
 export default defineComponent({
-  name: 'HardwareCard',
+  name: "HardwareCard",
   components: { IonIcon, MetricGauge },
 
   props: {
     instance: { type: Object as PropType<PiholeInstance>, required: true },
-    hwData:   { type: Object as PropType<HardwareInfo | null>, default: null },
-    loading:  { type: Boolean, default: false },
+    hwData: { type: Object as PropType<HardwareInfo | null>, default: null },
+    loading: { type: Boolean, default: false },
   },
 
-  emits: ['refresh'],
+  emits: ["refresh"],
 
   setup(props) {
     const { loadColor, tempColor, fmtDateTime } = useFormatting();
@@ -130,36 +187,89 @@ export default defineComponent({
     const noData = computed(() => {
       const d = props.hwData;
       if (!d) return true;
-      return [d.cpuLoad, d.cpuTemp, d.memPercent, d.diskPercent, d.hostname, d.uptimeFormatted].every((v) => v == null);
+      return [
+        d.cpuLoad,
+        d.cpuTemp,
+        d.memPercent,
+        d.diskPercent,
+        d.hostname,
+        d.uptimeFormatted,
+      ].every((v) => v == null);
     });
 
-    return { loadColor, tempColor, fmtDateTime, memSub, diskSub, noData, hwService: HardwareService, warningOutline, refreshOutline };
+    return {
+      loadColor,
+      tempColor,
+      fmtDateTime,
+      memSub,
+      diskSub,
+      noData,
+      hwService: HardwareService,
+      warningOutline,
+      refreshOutline,
+    };
   },
 });
 </script>
 
 <style scoped>
-.hw-instance-card { padding: 0; overflow: hidden; }
-.hw-card-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 16px 20px; border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; gap: 6px;
+.hw-instance-card {
+  padding: 0;
+  overflow: hidden;
 }
-.hw-loading { padding: 20px; }
+.hw-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.hw-loading {
+  padding: 20px;
+}
 .hw-metrics-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   border-bottom: 1px solid var(--border-subtle);
 }
-.hw-info-table { border-top: 1px solid var(--border-subtle); }
-.hw-info-row {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 8px 20px; border-bottom: 1px solid var(--border-subtle); gap: 12px;
+.hw-info-table {
+  border-top: 1px solid var(--border-subtle);
 }
-.hw-info-row:last-child { border-bottom: none; }
-.hw-info-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
-.hw-info-value { font-size: 13px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hw-info-value.mono { font-family: var(--font-mono); font-size: 12px; }
+.hw-info-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  gap: 12px;
+}
+.hw-info-row:last-child {
+  border-bottom: none;
+}
+.hw-info-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.hw-info-value {
+  font-size: 13px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hw-info-value.mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
 .ioc-offline {
-  display: flex; align-items: center; gap: 8px;
-  padding: 20px; color: var(--accent-red); font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px;
+  color: var(--accent-red);
+  font-size: 13px;
 }
 </style>

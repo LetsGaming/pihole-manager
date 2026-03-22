@@ -5,9 +5,12 @@
  * Components call start()/stop() and the interval is always cleared on unmount.
  */
 
-import { ref, onBeforeUnmount } from 'vue';
+import { ref, onBeforeUnmount } from "vue";
 
-export function useLivePolling(callback: () => void | Promise<void>, intervalMs: number) {
+export function useLivePolling(
+  callback: () => void | Promise<void>,
+  intervalMs: number,
+) {
   const isLive = ref(true);
   let handle: ReturnType<typeof setInterval> | null = null;
 

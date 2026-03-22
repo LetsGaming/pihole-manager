@@ -5,22 +5,22 @@
  * Shared by SettingsView and any composable that needs polling intervals.
  */
 
-import { reactive } from 'vue';
+import { reactive } from "vue";
 
 export interface AppSettings {
-  pollInterval:         number; // ms
-  logRefreshInterval:   number; // ms
+  pollInterval: number; // ms
+  logRefreshInterval: number; // ms
   defaultDisableDuration: number; // seconds; 0 = indefinite
-  queryLogLimit:        number;
+  queryLogLimit: number;
 }
 
-const SETTINGS_KEY = 'orbital_app_settings';
+const SETTINGS_KEY = "orbital_app_settings";
 
 const DEFAULTS: AppSettings = {
-  pollInterval:           30_000,
-  logRefreshInterval:      5_000,
-  defaultDisableDuration:      0,
-  queryLogLimit:             100,
+  pollInterval: 30_000,
+  logRefreshInterval: 5_000,
+  defaultDisableDuration: 0,
+  queryLogLimit: 100,
 };
 
 export function useAppSettings() {
@@ -30,7 +30,9 @@ export function useAppSettings() {
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
       if (raw) Object.assign(settings, JSON.parse(raw) as Partial<AppSettings>);
-    } catch { /* ignore corrupt data */ }
+    } catch {
+      /* ignore corrupt data */
+    }
   }
 
   function save(): void {

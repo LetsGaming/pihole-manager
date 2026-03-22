@@ -4,7 +4,7 @@
  * Wrapper around navigator.clipboard.writeText with notification feedback.
  */
 
-import { useNotificationStore } from '@/stores/notificationStore';
+import { useNotificationStore } from "@/stores/notificationStore";
 
 export function useClipboard() {
   const notifications = useNotificationStore();
@@ -14,7 +14,7 @@ export function useClipboard() {
       await navigator.clipboard.writeText(text);
       notifications.info(`Copied: ${label}`);
     } catch {
-      notifications.error('Could not copy to clipboard');
+      notifications.error("Could not copy to clipboard");
     }
   }
 

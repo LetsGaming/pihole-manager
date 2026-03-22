@@ -1,21 +1,21 @@
-import { defineStore } from 'pinia';
+import { defineStore } from "pinia";
 
-export type ToastType = 'success' | 'error' | 'warning' | 'info';
+export type ToastType = "success" | "error" | "warning" | "info";
 
 export interface Toast {
-  id:      number;
-  type:    ToastType;
+  id: number;
+  type: ToastType;
   message: string;
 }
 
 interface NotificationState {
-  toasts:  Toast[];
+  toasts: Toast[];
   _nextId: number;
 }
 
-export const useNotificationStore = defineStore('notifications', {
+export const useNotificationStore = defineStore("notifications", {
   state: (): NotificationState => ({
-    toasts:  [],
+    toasts: [],
     _nextId: 1,
   }),
 
@@ -27,10 +27,18 @@ export const useNotificationStore = defineStore('notifications', {
       return id;
     },
 
-    success(message: string, duration?: number): number { return this.show('success', message, duration); },
-    error  (message: string, duration?: number): number { return this.show('error',   message, duration); },
-    warning(message: string, duration?: number): number { return this.show('warning', message, duration); },
-    info   (message: string, duration?: number): number { return this.show('info',    message, duration); },
+    success(message: string, duration?: number): number {
+      return this.show("success", message, duration);
+    },
+    error(message: string, duration?: number): number {
+      return this.show("error", message, duration);
+    },
+    warning(message: string, duration?: number): number {
+      return this.show("warning", message, duration);
+    },
+    info(message: string, duration?: number): number {
+      return this.show("info", message, duration);
+    },
 
     dismiss(id: number): void {
       this.toasts = this.toasts.filter((t) => t.id !== id);
