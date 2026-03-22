@@ -29,7 +29,10 @@
 
       <template v-else>
         <!-- Stat cards — same layout for both single and all-instances -->
-        <StatsOverviewCards :summary="displaySummary" :aggregate-mode="isAllMode" />
+        <StatsOverviewCards
+          :summary="displaySummary"
+          :aggregate-mode="isAllMode"
+        />
 
         <!-- Chart -->
         <StatsChart
@@ -123,10 +126,7 @@ function mergeOverTimeData(datasets: OverTimeData[]): OverTimeData {
  * top N entries sorted descending. Using union of keys gives us "unique"
  * domains/clients across all instances naturally.
  */
-function mergeTopMaps(
-  maps: TopDomainsMap[],
-  limit = 10,
-): TopDomainsMap {
+function mergeTopMaps(maps: TopDomainsMap[], limit = 10): TopDomainsMap {
   const merged: Record<string, number> = {};
   for (const map of maps) {
     for (const [key, count] of Object.entries(map)) {
@@ -219,7 +219,7 @@ export default defineComponent({
         hasData = true;
         totalQueries += Number(s.dns_queries_today) || 0;
         totalBlocked += Number(s.ads_blocked_today) || 0;
-        totalCached  += Number(s.queries_cached)    || 0;
+        totalCached += Number(s.queries_cached) || 0;
       });
 
       if (!hasData) return null;
@@ -239,17 +239,19 @@ export default defineComponent({
       let domainsBeingBlocked = 0;
       instances.forEach((inst) => {
         domainsBeingBlocked +=
-          Number(this.instancesStore.summaryData[inst.id]?.domains_being_blocked) || 0;
+          Number(
+            this.instancesStore.summaryData[inst.id]?.domains_being_blocked,
+          ) || 0;
       });
 
       return {
         status: "enabled",
-        dns_queries_today:    totalQueries,
-        ads_blocked_today:    totalBlocked,
+        dns_queries_today: totalQueries,
+        ads_blocked_today: totalBlocked,
         ads_percentage_today: parseFloat(blockPct.toFixed(1)),
         domains_being_blocked: domainsBeingBlocked,
-        unique_clients:       uniqueClients,
-        queries_cached:       totalCached,
+        unique_clients: uniqueClients,
+        queries_cached: totalCached,
       };
     },
   },
@@ -290,10 +292,7 @@ export default defineComponent({
     // ── Single instance ──────────────────────────────────────────────────────
 
     async loadSingleInstanceData(): Promise<void> {
-      await Promise.allSettled([
-        this.loadOverTime(),
-        this.loadTopData(),
-      ]);
+      await Promise.allSettled([this.loadOverTime(), this.loadTopData()]);
     },
 
     async loadOverTime(): Promise<void> {
@@ -328,9 +327,15 @@ export default defineComponent({
           clientsResult.status === "fulfilled" ? clientsResult.value : {};
 
         if (topResult.status === "rejected")
-          console.error("[StatisticsView] topDomains failed:", topResult.reason);
+          console.error(
+            "[StatisticsView] topDomains failed:",
+            topResult.reason,
+          );
         if (clientsResult.status === "rejected")
-          console.error("[StatisticsView] topClients failed:", clientsResult.reason);
+          console.error(
+            "[StatisticsView] topClients failed:",
+            clientsResult.reason,
+          );
       } finally {
         this.isLoadingTop = false;
       }
@@ -359,10 +364,15 @@ export default defineComponent({
           instances.map((inst) => PiholeApiService.getOverTimeData(inst)),
         );
         const datasets = results
-          .filter((r): r is PromiseFulfilledResult<OverTimeData> => r.status === "fulfilled")
+          .filter(
+            (r): r is PromiseFulfilledResult<OverTimeData> =>
+              r.status === "fulfilled",
+          )
           .map((r) => r.value);
 
-        this.overTimeData = datasets.length ? mergeOverTimeData(datasets) : null;
+        this.overTimeData = datasets.length
+          ? mergeOverTimeData(datasets)
+          : null;
       } catch (err) {
         console.error("[StatisticsView] loadAllOverTime failed:", err);
         this.overTimeData = null;
@@ -386,7 +396,14 @@ export default defineComponent({
         ]);
 
         const topMaps = topResults
-          .filter((r): r is PromiseFulfilledResult<{ topDomains: TopDomainsMap; topBlocked: TopDomainsMap }> => r.status === "fulfilled")
+          .filter(
+            (
+              r,
+            ): r is PromiseFulfilledResult<{
+              topDomains: TopDomainsMap;
+              topBlocked: TopDomainsMap;
+            }> => r.status === "fulfilled",
+          )
           .map((r) => r.value);
 
         // Merge and deduplicate — union of keys gives unique domains/clients
@@ -394,7 +411,10 @@ export default defineComponent({
         this.topBlocked = mergeTopMaps(topMaps.map((t) => t.topBlocked));
 
         const clientMaps = clientResults
-          .filter((r): r is PromiseFulfilledResult<TopClientsMap> => r.status === "fulfilled")
+          .filter(
+            (r): r is PromiseFulfilledResult<TopClientsMap> =>
+              r.status === "fulfilled",
+          )
           .map((r) => r.value);
 
         this.topClients = mergeTopMaps(clientMaps);

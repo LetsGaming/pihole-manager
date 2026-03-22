@@ -139,8 +139,13 @@ export default defineComponent({
     "clear",
   ],
 
-  setup() {
-    return { searchOutline, pauseOutline, playOutline, trashOutline };
+  data() {
+    return {
+      searchOutline,
+      pauseOutline,
+      playOutline,
+      trashOutline,
+    };
   },
 });
 </script>

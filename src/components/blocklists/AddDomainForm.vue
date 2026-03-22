@@ -7,14 +7,14 @@
       <input
         class="field-input"
         v-model="domain"
-          style="flex: 1; min-width: 200px"
+        style="flex: 1; min-width: 200px"
         :placeholder="placeholder"
         @keyup.enter="submit"
       />
       <input
         class="field-input"
         v-model="comment"
-          style="width: 200px"
+        style="width: 200px"
         placeholder="Comment (optional)"
       />
       <button
@@ -30,7 +30,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import { IonIcon } from "@ionic/vue";
 import { addOutline } from "ionicons/icons";
 
@@ -45,18 +45,21 @@ export default defineComponent({
 
   emits: ["add"],
 
-  setup(_, { emit }) {
-    const domain = ref("");
-    const comment = ref("");
+  data() {
+    return {
+      domain: "",
+      comment: "",
+      addOutline,
+    };
+  },
 
-    function submit() {
-      if (!domain.value.trim()) return;
-      emit("add", domain.value.trim(), comment.value.trim());
-      domain.value = "";
-      comment.value = "";
-    }
-
-    return { domain, comment, submit, addOutline };
+  methods: {
+    submit() {
+      if (!this.domain.trim()) return;
+      this.$emit("add", this.domain.trim(), this.comment.trim());
+      this.domain = "";
+      this.comment = "";
+    },
   },
 });
 </script>

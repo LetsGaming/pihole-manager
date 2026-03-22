@@ -7,11 +7,40 @@
             <div class="sidebar-brand">
               <div class="brand-icon">
                 <svg viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="20" cy="20" r="18" fill="none" stroke="var(--accent-cyan)" stroke-width="2"/>
-                  <circle cx="20" cy="20" r="8" fill="var(--accent-cyan)" opacity="0.3"/>
-                  <line x1="20" y1="2" x2="20" y2="38" stroke="var(--accent-cyan)" stroke-width="1" opacity="0.5"/>
-                  <line x1="2" y1="20" x2="38" y2="20" stroke="var(--accent-cyan)" stroke-width="1" opacity="0.5"/>
-                  <circle cx="20" cy="20" r="3" fill="var(--accent-cyan)"/>
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="18"
+                    fill="none"
+                    stroke="var(--accent-cyan)"
+                    stroke-width="2"
+                  />
+                  <circle
+                    cx="20"
+                    cy="20"
+                    r="8"
+                    fill="var(--accent-cyan)"
+                    opacity="0.3"
+                  />
+                  <line
+                    x1="20"
+                    y1="2"
+                    x2="20"
+                    y2="38"
+                    stroke="var(--accent-cyan)"
+                    stroke-width="1"
+                    opacity="0.5"
+                  />
+                  <line
+                    x1="2"
+                    y1="20"
+                    x2="38"
+                    y2="20"
+                    stroke="var(--accent-cyan)"
+                    stroke-width="1"
+                    opacity="0.5"
+                  />
+                  <circle cx="20" cy="20" r="3" fill="var(--accent-cyan)" />
                 </svg>
               </div>
               <div class="brand-text">
@@ -36,7 +65,10 @@
               @click="instanceStore.setActiveInstance(inst.id)"
               @keydown.enter="instanceStore.setActiveInstance(inst.id)"
             >
-              <div class="instance-status-dot" :class="`status-${inst.status}`" />
+              <div
+                class="instance-status-dot"
+                :class="`status-${inst.status}`"
+              />
               <span class="instance-chip-name">{{ inst.name }}</span>
             </div>
             <div class="section-label mt-2">NAVIGATE</div>
@@ -61,12 +93,19 @@
           </ion-list>
 
           <div class="sidebar-footer">
-            <div v-if="instanceStore.instances.length" class="global-status-row">
+            <div
+              v-if="instanceStore.instances.length"
+              class="global-status-row"
+            >
               <span class="status-label">Instances</span>
               <span class="status-counts">
-                <span class="count-ok">{{ instanceStore.onlineCount }} online</span>
+                <span class="count-ok"
+                  >{{ instanceStore.onlineCount }} online</span
+                >
                 <span class="count-sep">/</span>
-                <span class="count-err">{{ instanceStore.offlineCount }} offline</span>
+                <span class="count-err"
+                  >{{ instanceStore.offlineCount }} offline</span
+                >
               </span>
             </div>
             <div class="sidebar-footer-actions">
@@ -77,7 +116,7 @@
                 :title="`Switch to ${isDark ? 'light' : 'dark'} mode`"
                 @click="toggleTheme"
               >
-                {{ isDark ? '☀️' : '🌙' }}
+                {{ isDark ? "☀️" : "🌙" }}
               </button>
             </div>
           </div>
@@ -96,13 +135,27 @@
 <script lang="ts">
 import { defineComponent } from "vue";
 import {
-  IonApp, IonSplitPane, IonMenu, IonHeader, IonToolbar,
-  IonContent, IonList, IonItem, IonLabel, IonIcon,
-  IonMenuToggle, IonRouterOutlet,
+  IonApp,
+  IonSplitPane,
+  IonMenu,
+  IonHeader,
+  IonToolbar,
+  IonContent,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonIcon,
+  IonMenuToggle,
+  IonRouterOutlet,
 } from "@ionic/vue";
 import {
-  gridOutline, listOutline, shieldOutline, hardwareChipOutline,
-  settingsOutline, bookOutline, statsChartOutline,
+  gridOutline,
+  listOutline,
+  shieldOutline,
+  hardwareChipOutline,
+  settingsOutline,
+  bookOutline,
+  statsChartOutline,
 } from "ionicons/icons";
 import { useRoute } from "vue-router";
 import { useInstanceStore } from "@/stores/instanceStore";
@@ -113,23 +166,34 @@ const THEME_KEY = "orbital_theme";
 export default defineComponent({
   name: "App",
   components: {
-    IonApp, IonSplitPane, IonMenu, IonHeader, IonToolbar,
-    IonContent, IonList, IonItem, IonLabel, IonIcon,
-    IonMenuToggle, IonRouterOutlet, ToastContainer,
+    IonApp,
+    IonSplitPane,
+    IonMenu,
+    IonHeader,
+    IonToolbar,
+    IonContent,
+    IonList,
+    IonItem,
+    IonLabel,
+    IonIcon,
+    IonMenuToggle,
+    IonRouterOutlet,
+    ToastContainer,
   },
 
   data() {
-    const savedTheme = (localStorage.getItem(THEME_KEY) as "dark" | "light") ?? "dark";
+    const savedTheme =
+      (localStorage.getItem(THEME_KEY) as "dark" | "light") ?? "dark";
     return {
       theme: savedTheme as "dark" | "light",
       navItems: [
-        { path: "/dashboard",  label: "Dashboard",     icon: gridOutline },
-        { path: "/query-log",  label: "Query Log",     icon: listOutline },
-        { path: "/blocklists", label: "Block Lists",   icon: shieldOutline },
-        { path: "/hardware",   label: "Hardware",      icon: hardwareChipOutline },
-        { path: "/statistics", label: "Statistics",    icon: statsChartOutline },
-        { path: "/settings",   label: "Settings",      icon: settingsOutline },
-        { path: "/docs",       label: "Documentation", icon: bookOutline },
+        { path: "/dashboard", label: "Dashboard", icon: gridOutline },
+        { path: "/query-log", label: "Query Log", icon: listOutline },
+        { path: "/blocklists", label: "Block Lists", icon: shieldOutline },
+        { path: "/hardware", label: "Hardware", icon: hardwareChipOutline },
+        { path: "/statistics", label: "Statistics", icon: statsChartOutline },
+        { path: "/settings", label: "Settings", icon: settingsOutline },
+        { path: "/docs", label: "Documentation", icon: bookOutline },
       ],
     };
   },

@@ -19,50 +19,94 @@
     <!-- Sort pills -->
     <div v-if="sortKey" class="sort-pills sort-pills--in-card">
       <span class="text-xs text-muted" style="line-height: 24px">Sort:</span>
-      <span v-for="(level, idx) in sort.levels" :key="level.col" class="sort-pill">
+      <span
+        v-for="(level, idx) in sort.levels"
+        :key="level.col"
+        class="sort-pill"
+      >
         <span class="sort-pill-priority">{{ idx + 1 }}</span>
         {{ COLUMN_LABELS[level.col] ?? level.col }}
         {{ level.dir === "asc" ? "↑" : "↓" }}
-        <button class="sort-pill-remove" @click="onSortRemove(level.col)">×</button>
+        <button class="sort-pill-remove" @click="onSortRemove(level.col)">
+          ×
+        </button>
       </span>
-      <button class="btn btn-ghost btn-sm" style="padding: 2px 8px; font-size: 11px" @click="onSortClear">
+      <button
+        class="btn btn-ghost btn-sm"
+        style="padding: 2px 8px; font-size: 11px"
+        @click="onSortClear"
+      >
         Clear sort
       </button>
     </div>
 
     <div v-if="loading" class="p-3">
-      <div v-for="i in 4" :key="i" class="skeleton" style="height: 40px; margin-bottom: 6px" />
+      <div
+        v-for="i in 4"
+        :key="i"
+        class="skeleton"
+        style="height: 40px; margin-bottom: 6px"
+      />
     </div>
 
     <table v-else class="data-table">
       <thead>
         <tr>
-          <SortableHeader col="domain" label="Domain"  :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-          <SortableHeader col="comment" label="Comment" :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
-          <SortableHeader col="date"    label="Added"   :sort="sort" :sort-key="sortKey" @sort-changed="onSortChanged" />
+          <SortableHeader
+            col="domain"
+            label="Domain"
+            :sort="sort"
+            :sort-key="sortKey"
+            @sort-changed="onSortChanged"
+          />
+          <SortableHeader
+            col="comment"
+            label="Comment"
+            :sort="sort"
+            :sort-key="sortKey"
+            @sort-changed="onSortChanged"
+          />
+          <SortableHeader
+            col="date"
+            label="Added"
+            :sort="sort"
+            :sort-key="sortKey"
+            @sort-changed="onSortChanged"
+          />
           <th>Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr v-for="entry in displayedEntries" :key="entry.id">
           <td class="mono">{{ entry.domain }}</td>
-          <td style="color: var(--text-muted); font-size: 12px">{{ entry.comment || "—" }}</td>
+          <td style="color: var(--text-muted); font-size: 12px">
+            {{ entry.comment || "—" }}
+          </td>
           <td class="text-xs text-muted">
             {{ fmtDate(entry.date_added ? entry.date_added * 1000 : null) }}
           </td>
           <td>
             <div class="flex gap-2">
-              <button class="btn btn-ghost btn-sm btn-icon" @click="$emit('copy', entry.domain)">
+              <button
+                class="btn btn-ghost btn-sm btn-icon"
+                @click="$emit('copy', entry.domain)"
+              >
                 <ion-icon :icon="copyOutline" />
               </button>
-              <button class="btn btn-danger btn-sm btn-icon" @click="$emit('remove', entry.domain)">
+              <button
+                class="btn btn-danger btn-sm btn-icon"
+                @click="$emit('remove', entry.domain)"
+              >
                 <ion-icon :icon="trashOutline" />
               </button>
             </div>
           </td>
         </tr>
         <tr v-if="!displayedEntries.length">
-          <td colspan="4" style="text-align: center; padding: 30px; color: var(--text-muted)">
+          <td
+            colspan="4"
+            style="text-align: center; padding: 30px; color: var(--text-muted)"
+          >
             {{ searchQuery ? "No matching entries" : "List is empty" }}
           </td>
         </tr>
@@ -83,15 +127,17 @@ import type { MultiSort } from "@/composables/useMultiSort";
 import SortableHeader from "@/components/ui/SortableHeader.vue";
 
 const COLUMN_LABELS: Record<string, string> = {
-  domain:  "Domain",
+  domain: "Domain",
   comment: "Comment",
-  date:    "Added",
+  date: "Added",
 };
 
-const ACCESSORS: Partial<Record<string, (e: DomainEntry) => string | number | null>> = {
-  domain:  (e) => e.domain,
+const ACCESSORS: Partial<
+  Record<string, (e: DomainEntry) => string | number | null>
+> = {
+  domain: (e) => e.domain,
   comment: (e) => e.comment || "",
-  date:    (e) => e.date_added ?? null,
+  date: (e) => e.date_added ?? null,
 };
 
 export default defineComponent({
@@ -99,10 +145,10 @@ export default defineComponent({
   components: { IonIcon, SortableHeader },
 
   props: {
-    title:       { type: String,                           required: true },
-    entries:     { type: Array as PropType<DomainEntry[]>, default: () => [] },
-    searchQuery: { type: String,                           default: "" },
-    loading:     { type: Boolean,                          default: false },
+    title: { type: String, required: true },
+    entries: { type: Array as PropType<DomainEntry[]>, default: () => [] },
+    searchQuery: { type: String, default: "" },
+    loading: { type: Boolean, default: false },
   },
 
   emits: ["update:searchQuery", "refresh", "remove", "copy"],
@@ -110,12 +156,12 @@ export default defineComponent({
   data() {
     const { fmtDate } = useFormatting();
     return {
-      sort:             markRaw(useMultiSort()) as MultiSort,
-      sortKey:          "" as string,
-      rawEntries:      markRaw([] as DomainEntry[]),
-      localSearchQuery:     "" as string,   // internal copy, avoids prop-watch lag
+      sort: markRaw(useMultiSort()) as MultiSort,
+      sortKey: "" as string,
+      rawEntries: markRaw([] as DomainEntry[]),
+      localSearchQuery: "" as string, // internal copy, avoids prop-watch lag
       displayedEntries: [] as DomainEntry[],
-      totalDisplayed:   0  as number,
+      totalDisplayed: 0 as number,
       fmtDate,
       COLUMN_LABELS,
       refreshOutline,
@@ -181,7 +227,7 @@ export default defineComponent({
       }
 
       // 3. Write results — Vue only tracks these scalar/ref changes
-      this.totalDisplayed   = result.length;
+      this.totalDisplayed = result.length;
       this.displayedEntries = result;
     },
   },

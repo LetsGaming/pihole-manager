@@ -131,7 +131,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch } from "vue";
+import { defineComponent } from "vue";
 import type { PropType } from "vue";
 import {
   IonModal,
@@ -177,94 +177,20 @@ export default defineComponent({
 
   emits: ["close", "save"],
 
-  setup(props, { emit }) {
-    const local = ref<NewInstanceConfig>({
-      name: "",
-      url: "",
-      apiToken: "",
-      apiVersion: "v5",
-    });
-    const showToken = ref(false);
-    const testing = ref(false);
-    const saving = ref(false);
-    const error = ref<string | null>(null);
-    const testResult = ref<ConnectionTestResult | null>(null);
-
-    const isEditing = ref(false);
-
-    // Populate form when switching to edit mode
-    watch(
-      () => props.editing,
-      (inst) => {
-        if (inst) {
-          isEditing.value = true;
-          local.value = {
-            name: inst.name,
-            url: inst.url,
-            apiToken: inst.apiToken,
-            apiVersion: inst.apiVersion,
-          };
-        } else {
-          isEditing.value = false;
-          local.value = { name: "", url: "", apiToken: "", apiVersion: "v5" };
-        }
-        error.value = null;
-        testResult.value = null;
-        showToken.value = false;
-      },
-      { immediate: true },
-    );
-
-    async function runTest() {
-      if (!local.value.url || !local.value.apiToken) {
-        testResult.value = {
-          ok: false,
-          message: "Fill in URL and API Token first",
-          latencyMs: 0,
-        };
-        return;
-      }
-      testing.value = true;
-      testResult.value = null;
-      try {
-        testResult.value = await PiholeApiService.testConnection({
-          id: "_test",
-          status: "unknown" as const,
-          addedAt: "",
-          ...local.value,
-          url: local.value.url.replace(/\/$/, ""),
-        });
-      } finally {
-        testing.value = false;
-      }
-    }
-
-    async function submit() {
-      saving.value = true;
-      error.value = null;
-      try {
-        emit(
-          "save",
-          { ...local.value, url: local.value.url.replace(/\/$/, "") },
-          props.editing?.id ?? null,
-        );
-      } catch (err) {
-        error.value = (err as Error).message ?? "Failed to save";
-      } finally {
-        saving.value = false;
-      }
-    }
-
+  data() {
     return {
-      local,
-      showToken,
-      testing,
-      saving,
-      error,
-      testResult,
-      isEditing,
-      runTest,
-      submit,
+      local: {
+        name: "",
+        url: "",
+        apiToken: "",
+        apiVersion: "v5",
+      } as NewInstanceConfig,
+      showToken: false,
+      testing: false,
+      saving: false,
+      error: null as string | null,
+      testResult: null as ConnectionTestResult | null,
+      isEditing: false,
       eyeOutline,
       eyeOffOutline,
       warningOutline,
@@ -273,6 +199,71 @@ export default defineComponent({
       syncOutline,
       pulseOutline,
     };
+  },
+
+  watch: {
+    editing: {
+      immediate: true,
+      handler(inst: PiholeInstance | null) {
+        if (inst) {
+          this.isEditing = true;
+          this.local = {
+            name: inst.name,
+            url: inst.url,
+            apiToken: inst.apiToken,
+            apiVersion: inst.apiVersion,
+          };
+        } else {
+          this.isEditing = false;
+          this.local = { name: "", url: "", apiToken: "", apiVersion: "v5" };
+        }
+        this.error = null;
+        this.testResult = null;
+        this.showToken = false;
+      },
+    },
+  },
+
+  methods: {
+    async runTest() {
+      if (!this.local.url || !this.local.apiToken) {
+        this.testResult = {
+          ok: false,
+          message: "Fill in URL and API Token first",
+          latencyMs: 0,
+        };
+        return;
+      }
+      this.testing = true;
+      this.testResult = null;
+      try {
+        this.testResult = await PiholeApiService.testConnection({
+          id: "_test",
+          status: "unknown" as const,
+          addedAt: "",
+          ...this.local,
+          url: this.local.url.replace(/\/$/, ""),
+        });
+      } finally {
+        this.testing = false;
+      }
+    },
+
+    async submit() {
+      this.saving = true;
+      this.error = null;
+      try {
+        this.$emit(
+          "save",
+          { ...this.local, url: this.local.url.replace(/\/$/, "") },
+          this.editing?.id ?? null,
+        );
+      } catch (err) {
+        this.error = (err as Error).message ?? "Failed to save";
+      } finally {
+        this.saving = false;
+      }
+    },
   },
 });
 </script>

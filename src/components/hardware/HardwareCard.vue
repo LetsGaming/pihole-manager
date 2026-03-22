@@ -149,7 +149,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent } from "vue";
 import type { PropType } from "vue";
 import { IonIcon } from "@ionic/vue";
 import { warningOutline, refreshOutline } from "ionicons/icons";
@@ -158,6 +158,8 @@ import HardwareService from "@/services/hardwareService";
 import type { PiholeInstance } from "@/types/instance";
 import type { HardwareInfo } from "@/types/hardware";
 import { useFormatting } from "@/composables/useFormatting";
+
+const { loadColor, tempColor, fmtDateTime } = useFormatting();
 
 export default defineComponent({
   name: "HardwareCard",
@@ -171,21 +173,28 @@ export default defineComponent({
 
   emits: ["refresh"],
 
-  setup(props) {
-    const { loadColor, tempColor, fmtDateTime } = useFormatting();
+  data() {
+    return {
+      loadColor,
+      tempColor,
+      fmtDateTime,
+      hwService: HardwareService,
+      warningOutline,
+      refreshOutline,
+    };
+  },
 
-    const memSub = computed(() => {
-      if (!props.hwData?.memUsed || !props.hwData?.memTotal) return undefined;
-      return `${HardwareService.formatBytes(props.hwData.memUsed)} / ${HardwareService.formatBytes(props.hwData.memTotal)}`;
-    });
-
-    const diskSub = computed(() => {
-      if (!props.hwData?.diskUsed || !props.hwData?.diskTotal) return undefined;
-      return `${HardwareService.formatBytes(props.hwData.diskUsed)} / ${HardwareService.formatBytes(props.hwData.diskTotal)}`;
-    });
-
-    const noData = computed(() => {
-      const d = props.hwData;
+  computed: {
+    memSub(): string | undefined {
+      if (!this.hwData?.memUsed || !this.hwData?.memTotal) return undefined;
+      return `${HardwareService.formatBytes(this.hwData.memUsed)} / ${HardwareService.formatBytes(this.hwData.memTotal)}`;
+    },
+    diskSub(): string | undefined {
+      if (!this.hwData?.diskUsed || !this.hwData?.diskTotal) return undefined;
+      return `${HardwareService.formatBytes(this.hwData.diskUsed)} / ${HardwareService.formatBytes(this.hwData.diskTotal)}`;
+    },
+    noData(): boolean {
+      const d = this.hwData;
       if (!d) return true;
       return [
         d.cpuLoad,
@@ -195,19 +204,7 @@ export default defineComponent({
         d.hostname,
         d.uptimeFormatted,
       ].every((v) => v == null);
-    });
-
-    return {
-      loadColor,
-      tempColor,
-      fmtDateTime,
-      memSub,
-      diskSub,
-      noData,
-      hwService: HardwareService,
-      warningOutline,
-      refreshOutline,
-    };
+    },
   },
 });
 </script>

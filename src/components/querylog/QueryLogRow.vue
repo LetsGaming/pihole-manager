@@ -69,9 +69,14 @@ export default defineComponent({
 
   emits: ["whitelist", "blacklist", "copy"],
 
-  setup() {
+  data() {
     const { fmtTime } = useFormatting();
-    return { fmtTime, checkmarkCircleOutline, banOutline, copyOutline };
+    return {
+      fmtTime,
+      checkmarkCircleOutline,
+      banOutline,
+      copyOutline,
+    };
   },
 });
 </script>

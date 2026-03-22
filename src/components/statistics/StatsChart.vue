@@ -2,7 +2,9 @@
   <div class="card mb-3">
     <div class="card-header">
       <span class="card-title">QUERIES OVER TIME (24H)</span>
-      <span v-if="instanceName" class="text-xs text-muted text-mono">{{ instanceName }}</span>
+      <span v-if="instanceName" class="text-xs text-muted text-mono">{{
+        instanceName
+      }}</span>
     </div>
     <div v-if="loading" class="skeleton" style="height: 200px" />
     <div v-else-if="hasData">
@@ -84,14 +86,17 @@ export default defineComponent({
 
       // Determine chart colors from CSS variables for theme-awareness
       const style = getComputedStyle(document.documentElement);
-      const gridColor = style.getPropertyValue("--chart-grid").trim() || "rgba(255,255,255,0.04)";
-      const tickColor = style.getPropertyValue("--chart-tick").trim() || "#475569";
+      const gridColor =
+        style.getPropertyValue("--chart-grid").trim() ||
+        "rgba(255,255,255,0.04)";
+      const tickColor =
+        style.getPropertyValue("--chart-tick").trim() || "#475569";
 
       const labels = Object.keys(data.domains).map((t) =>
         new Date(parseInt(t, 10) * 1000).toLocaleTimeString([], {
           hour: "2-digit",
           minute: "2-digit",
-        })
+        }),
       );
 
       this.chartInstance = new Chart<"line", number[], string>(canvas, {

@@ -22,7 +22,8 @@
   </div>
 </template>
 
-<script>
+<script lang="ts">
+import { defineComponent } from "vue";
 import { IonIcon } from "@ionic/vue";
 import {
   checkmarkCircleOutline,
@@ -33,22 +34,21 @@ import {
 } from "ionicons/icons";
 import { useNotificationStore } from "@/stores/notificationStore";
 
-export default {
+export default defineComponent({
   name: "ToastContainer",
 
   components: { IonIcon },
 
-  setup() {
-    return { notifications: useNotificationStore() };
-  },
-
   data() {
-    return { closeOutline };
+    return {
+      notifications: useNotificationStore(),
+      closeOutline,
+    };
   },
 
   methods: {
-    iconFor(type) {
-      const map = {
+    iconFor(type: string) {
+      const map: Record<string, string> = {
         success: checkmarkCircleOutline,
         error: alertCircleOutline,
         warning: warningOutline,
@@ -57,7 +57,7 @@ export default {
       return map[type] || informationCircleOutline;
     },
   },
-};
+});
 </script>
 
 <style scoped>

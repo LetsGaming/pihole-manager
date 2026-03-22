@@ -30,7 +30,10 @@ export default defineComponent({
     /** Optional sub-label below the number */
     sub: { type: String as PropType<string | null>, default: null },
     /** Optional ionicon — accepts the icon object or resolved SVG string */
-    icon: { type: [Object, String] as PropType<object | string | null>, default: null },
+    icon: {
+      type: [Object, String] as PropType<object | string | null>,
+      default: null,
+    },
   },
 });
 </script>

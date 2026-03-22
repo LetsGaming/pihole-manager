@@ -37,7 +37,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
+import { defineComponent } from "vue";
 import {
   IonModal,
   IonHeader,
@@ -70,12 +70,17 @@ export default defineComponent({
 
   emits: ["close", "confirm"],
 
-  setup(_, { emit }) {
-    const duration = ref(0);
-    function confirm() {
-      emit("confirm", duration.value);
-    }
-    return { duration, confirm, shieldOutline };
+  data() {
+    return {
+      duration: 0,
+      shieldOutline,
+    };
+  },
+
+  methods: {
+    confirm() {
+      this.$emit("confirm", this.duration);
+    },
   },
 });
 </script>

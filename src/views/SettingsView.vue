@@ -185,7 +185,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted } from "vue";
+import { defineComponent } from "vue";
 import { IonPage, IonContent, IonIcon, IonAlert } from "@ionic/vue";
 import {
   addOutline,
@@ -207,6 +207,8 @@ import { useAppSettings } from "@/composables/useAppSettings";
 import PiholeApiService from "@/services/piholeApi";
 import type { PiholeInstance, NewInstanceConfig } from "@/types/instance";
 
+const { settings, load, save } = useAppSettings();
+
 export default defineComponent({
   name: "SettingsView",
   components: {
@@ -219,75 +221,100 @@ export default defineComponent({
     InstanceForm,
   },
 
-  setup() {
-    const instanceStore = useInstanceStore();
-    const notifications = useNotificationStore();
-    const { settings, load, save } = useAppSettings();
+  data() {
+    return {
+      instanceStore: useInstanceStore(),
+      notifications: useNotificationStore(),
+      settings,
+      save,
+      showForm: false,
+      editingInstance: null as PiholeInstance | null,
+      showRemoveAlert: false,
+      pendingRemove: null as PiholeInstance | null,
+      removeButtons: [] as {
+        text: string;
+        role: string;
+        handler?: () => void;
+      }[],
+      addOutline,
+      pencilOutline,
+      trashOutline,
+      pulseOutline,
+      serverOutline,
+      downloadOutline,
+      cloudUploadOutline,
+    };
+  },
 
-    const showForm = ref(false);
-    const editingInstance = ref<PiholeInstance | null>(null);
-    const showRemoveAlert = ref(false);
-    const pendingRemove = ref<PiholeInstance | null>(null);
-
-    function openAdd() {
-      editingInstance.value = null;
-      showForm.value = true;
-    }
-    function openEdit(inst: PiholeInstance) {
-      editingInstance.value = inst;
-      showForm.value = true;
-    }
-    function closeForm() {
-      showForm.value = false;
-      editingInstance.value = null;
-    }
-
-    function handleSave(config: NewInstanceConfig, editingId: string | null) {
-      if (editingId) {
-        instanceStore.updateInstance(editingId, config);
-        notifications.success(`Updated "${config.name}"`);
-      } else {
-        instanceStore.addInstance(config);
-        notifications.success(`Added "${config.name}"`);
-      }
-      closeForm();
-    }
-
-    function confirmRemove(inst: PiholeInstance) {
-      pendingRemove.value = inst;
-      showRemoveAlert.value = true;
-    }
-
-    const removeButtons = [
+  created() {
+    this.removeButtons = [
       { text: "Cancel", role: "cancel" },
       {
         text: "Remove",
         role: "destructive",
         handler: () => {
-          if (!pendingRemove.value) return;
-          instanceStore.removeInstance(pendingRemove.value.id);
-          notifications.info(`Removed "${pendingRemove.value.name}"`);
-          pendingRemove.value = null;
+          if (!this.pendingRemove) return;
+          this.instanceStore.removeInstance(this.pendingRemove.id);
+          this.notifications.info(`Removed "${this.pendingRemove.name}"`);
+          this.pendingRemove = null;
         },
       },
     ];
+  },
 
-    async function runQuickTest(inst: PiholeInstance) {
-      notifications.info(`Testing ${inst.name}…`);
+  mounted() {
+    this.instanceStore.loadFromStorage();
+    load();
+  },
+
+  methods: {
+    openAdd() {
+      this.editingInstance = null;
+      this.showForm = true;
+    },
+    openEdit(inst: PiholeInstance) {
+      this.editingInstance = inst;
+      this.showForm = true;
+    },
+    closeForm() {
+      this.showForm = false;
+      this.editingInstance = null;
+    },
+
+    handleSave(config: NewInstanceConfig, editingId: string | null) {
+      if (editingId) {
+        this.instanceStore.updateInstance(editingId, config);
+        this.notifications.success(`Updated "${config.name}"`);
+      } else {
+        this.instanceStore.addInstance(config);
+        this.notifications.success(`Added "${config.name}"`);
+      }
+      this.closeForm();
+    },
+
+    confirmRemove(inst: PiholeInstance) {
+      this.pendingRemove = inst;
+      this.showRemoveAlert = true;
+    },
+
+    async runQuickTest(inst: PiholeInstance) {
+      this.notifications.info(`Testing ${inst.name}…`);
       const r = await PiholeApiService.testConnection(inst);
       r.ok
-        ? notifications.success(`${inst.name}: Connected (${r.latencyMs}ms)`)
-        : notifications.error(`${inst.name}: ${r.message}`);
-    }
+        ? this.notifications.success(
+            `${inst.name}: Connected (${r.latencyMs}ms)`,
+          )
+        : this.notifications.error(`${inst.name}: ${r.message}`);
+    },
 
-    function exportConfig() {
+    exportConfig() {
       const data = {
         version: 2,
         exportedAt: new Date().toISOString(),
-        instances: instanceStore.instances.map(
+        instances: this.instanceStore.instances.map(
           ({ id: _id, status: _s, addedAt: _a, ...rest }) => rest,
         ),
-        settings: { ...settings },
+        settings: { ...this.settings },
       };
       const url = URL.createObjectURL(
         new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
@@ -298,9 +325,9 @@ export default defineComponent({
       });
       a.click();
       URL.revokeObjectURL(url);
-    }
+    },
 
-    function importConfig(event: Event) {
+    importConfig(event: Event) {
       const file = (event.target as HTMLInputElement).files?.[0];
       if (!file) return;
       const reader = new FileReader();
@@ -309,59 +336,31 @@ export default defineComponent({
           const data = JSON.parse(e.target?.result as string);
           if (!data.instances) throw new Error("Invalid config file");
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          data.instances.forEach((cfg: any) => instanceStore.addInstance(cfg));
+          data.instances.forEach((cfg: any) =>
+            this.instanceStore.addInstance(cfg),
+          );
           if (data.settings) {
-            Object.assign(settings, data.settings);
-            save();
+            Object.assign(this.settings, data.settings);
+            this.save();
           }
-          notifications.success(`Imported ${data.instances.length} instances`);
+          this.notifications.success(
+            `Imported ${data.instances.length} instances`,
+          );
         } catch (err) {
-          notifications.error(`Import failed: ${(err as Error).message}`);
+          this.notifications.error(`Import failed: ${(err as Error).message}`);
         }
       };
       reader.readAsText(file);
       (event.target as HTMLInputElement).value = "";
-    }
+    },
 
-    function clearAll() {
+    clearAll() {
       if (!confirm("Clear ALL data? This cannot be undone.")) return;
-      [...instanceStore.instances].forEach((i) =>
-        instanceStore.removeInstance(i.id),
+      [...this.instanceStore.instances].forEach((i) =>
+        this.instanceStore.removeInstance(i.id),
       );
-      notifications.info("All data cleared");
-    }
-
-    onMounted(() => {
-      instanceStore.loadFromStorage();
-      load();
-    });
-
-    return {
-      instanceStore,
-      settings,
-      showForm,
-      editingInstance,
-      showRemoveAlert,
-      pendingRemove,
-      openAdd,
-      openEdit,
-      closeForm,
-      handleSave,
-      confirmRemove,
-      removeButtons,
-      runQuickTest,
-      exportConfig,
-      importConfig,
-      clearAll,
-      save,
-      addOutline,
-      pencilOutline,
-      trashOutline,
-      pulseOutline,
-      serverOutline,
-      downloadOutline,
-      cloudUploadOutline,
-    };
+      this.notifications.info("All data cleared");
+    },
   },
 });
 </script>

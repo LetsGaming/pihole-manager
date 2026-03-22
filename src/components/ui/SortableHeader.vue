@@ -13,7 +13,8 @@
           v-if="showPriority"
           class="sort-priority-badge"
           :title="`Sort priority ${priority}`"
-        >{{ priority }}</span>
+          >{{ priority }}</span
+        >
         <span class="sort-arrow" :class="{ visible: isActive }">
           {{ dir === "asc" ? "↑" : "↓" }}
         </span>
@@ -31,10 +32,10 @@ export default defineComponent({
   name: "SortableHeader",
 
   props: {
-    col:   { type: String,                        required: true },
-    label: { type: String,                        default: "" },
-    sort:  { type: Object as PropType<MultiSort>, required: true },
-    tag:   { type: String,                        default: "th" },
+    col: { type: String, required: true },
+    label: { type: String, default: "" },
+    sort: { type: Object as PropType<MultiSort>, required: true },
+    tag: { type: String, default: "th" },
     /**
      * Reactive fingerprint of the sort state, passed down from the parent
      * so this component re-renders when the sort changes even though sort
@@ -53,9 +54,13 @@ export default defineComponent({
       void this.sortKey;
       return this.sort.levelFor(this.col);
     },
-    isActive(): boolean  { return !!this.level; },
-    dir(): "asc" | "desc" { return this.level?.dir ?? "asc"; },
-    priority(): number   {
+    isActive(): boolean {
+      return !!this.level;
+    },
+    dir(): "asc" | "desc" {
+      return this.level?.dir ?? "asc";
+    },
+    priority(): number {
       void this.sortKey;
       return this.sort.priority(this.col);
     },
@@ -98,8 +103,12 @@ export default defineComponent({
   /* No display override — <th> keeps table-cell, <div> keeps block.
      Flex layout lives on the inner content span instead. */
 }
-.sortable-th:hover  { color: var(--text-primary); }
-.sortable-th.active { color: var(--accent-cyan); }
+.sortable-th:hover {
+  color: var(--text-primary);
+}
+.sortable-th.active {
+  color: var(--accent-cyan);
+}
 
 .sortable-th-content {
   display: inline-flex;
@@ -118,8 +127,12 @@ export default defineComponent({
   font-size: 13px;
   line-height: 1;
 }
-.sort-arrow.visible { opacity: 1; }
-.sortable-th:hover .sort-arrow:not(.visible) { opacity: 0.5; }
+.sort-arrow.visible {
+  opacity: 1;
+}
+.sortable-th:hover .sort-arrow:not(.visible) {
+  opacity: 0.5;
+}
 
 .sort-priority-badge {
   display: inline-flex;

@@ -2,7 +2,9 @@
   <div class="card">
     <div class="card-header">
       <span class="card-title">{{ title }}</span>
-      <span v-if="!loading && count > 0" class="badge badge-gray">{{ count }}</span>
+      <span v-if="!loading && count > 0" class="badge badge-gray">{{
+        count
+      }}</span>
     </div>
     <div v-if="loading" class="p-3">
       <div
@@ -22,7 +24,11 @@
         :variant="variant"
       />
     </template>
-    <div v-else class="text-muted text-sm" style="padding: 20px 16px; text-align: center">
+    <div
+      v-else
+      class="text-muted text-sm"
+      style="padding: 20px 16px; text-align: center"
+    >
       {{ emptyMessage }}
     </div>
   </div>

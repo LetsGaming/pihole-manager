@@ -30,7 +30,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, reactive, onMounted, onBeforeUnmount } from "vue";
+import { defineComponent } from "vue";
 import { IonPage, IonContent, IonIcon } from "@ionic/vue";
 import { refreshOutline, hardwareChipOutline } from "ionicons/icons";
 
@@ -56,76 +56,83 @@ export default defineComponent({
     HardwareCard,
   },
 
-  setup() {
-    const instanceStore = useInstanceStore();
-    const notifications = useNotificationStore();
-
-    const hwData: Record<string, HardwareInfo> = reactive({});
-    const loading: Record<string, boolean> = reactive({});
-    let refreshHandle: ReturnType<typeof setInterval> | null = null;
-
-    async function fetchHardware(inst: (typeof instanceStore.instances)[0]) {
-      loading[inst.id] = true;
-      try {
-        hwData[inst.id] = await HardwareService.getHardwareInfo(inst);
-      } catch (err) {
-        notifications.error(
-          `Hardware fetch failed for ${inst.name}: ${(err as Error).message}`,
-        );
-        // Set an empty record so the card shows "limited data" rather than "waiting…"
-        if (!hwData[inst.id]) {
-          hwData[inst.id] = {
-            cpuLoad: null,
-            cpuTemp: null,
-            cpuModel: null,
-            cpuCores: null,
-            memTotal: null,
-            memUsed: null,
-            memFree: null,
-            memPercent: null,
-            diskTotal: null,
-            diskUsed: null,
-            diskPercent: null,
-            hostname: null,
-            ipAddress: null,
-            interface: null,
-            uptimeSeconds: null,
-            uptimeFormatted: null,
-            piholeVersion: null,
-            ftlVersion: null,
-            webVersion: null,
-            domainsBlocked: null,
-            gravityLastUpdate: null,
-          };
-        }
-      } finally {
-        loading[inst.id] = false;
-      }
-    }
-
-    async function refreshAll() {
-      await Promise.allSettled(instanceStore.instances.map(fetchHardware));
-    }
-
-    onMounted(() => {
-      instanceStore.loadFromStorage();
-      void refreshAll();
-      refreshHandle = setInterval(() => void refreshAll(), REFRESH_INTERVAL_MS);
-    });
-
-    onBeforeUnmount(() => {
-      if (refreshHandle !== null) clearInterval(refreshHandle);
-    });
-
+  data() {
     return {
-      instanceStore,
-      hwData,
-      loading,
-      refreshAll,
-      fetchHardware,
+      instanceStore: useInstanceStore(),
+      notifications: useNotificationStore(),
+      hwData: {} as Record<string, HardwareInfo>,
+      loading: {} as Record<string, boolean>,
+      refreshHandle: null as ReturnType<typeof setInterval> | null,
       refreshOutline,
       hardwareChipOutline,
     };
+  },
+
+  mounted() {
+    this.instanceStore.loadFromStorage();
+    void this.refreshAll();
+    this.refreshHandle = setInterval(
+      () => void this.refreshAll(),
+      REFRESH_INTERVAL_MS,
+    );
+  },
+
+  beforeUnmount() {
+    if (this.refreshHandle !== null) clearInterval(this.refreshHandle);
+  },
+
+  methods: {
+    async fetchHardware(
+      inst: ReturnType<typeof useInstanceStore>["instances"][0],
+    ) {
+      this.loading = { ...this.loading, [inst.id]: true };
+      try {
+        this.hwData = {
+          ...this.hwData,
+          [inst.id]: await HardwareService.getHardwareInfo(inst),
+        };
+      } catch (err) {
+        this.notifications.error(
+          `Hardware fetch failed for ${inst.name}: ${(err as Error).message}`,
+        );
+        if (!this.hwData[inst.id]) {
+          this.hwData = {
+            ...this.hwData,
+            [inst.id]: {
+              cpuLoad: null,
+              cpuTemp: null,
+              cpuModel: null,
+              cpuCores: null,
+              memTotal: null,
+              memUsed: null,
+              memFree: null,
+              memPercent: null,
+              diskTotal: null,
+              diskUsed: null,
+              diskPercent: null,
+              hostname: null,
+              ipAddress: null,
+              interface: null,
+              uptimeSeconds: null,
+              uptimeFormatted: null,
+              piholeVersion: null,
+              ftlVersion: null,
+              webVersion: null,
+              domainsBlocked: null,
+              gravityLastUpdate: null,
+            },
+          };
+        }
+      } finally {
+        this.loading = { ...this.loading, [inst.id]: false };
+      }
+    },
+
+    async refreshAll() {
+      await Promise.allSettled(
+        this.instanceStore.instances.map((inst) => this.fetchHardware(inst)),
+      );
+    },
   },
 });
 </script>

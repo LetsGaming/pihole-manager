@@ -97,6 +97,8 @@ import type { PiholeInstance } from "@/types/instance";
 import type { PiholeSummary } from "@/types/api";
 import { useFormatting } from "@/composables/useFormatting";
 
+const { fmt, fmtPct } = useFormatting();
+
 export default defineComponent({
   name: "InstanceCard",
   components: { IonIcon },
@@ -110,8 +112,13 @@ export default defineComponent({
 
   emits: ["refresh", "toggle-blocking"],
 
-  setup() {
-    return { ...useFormatting(), refreshOutline, warningOutline };
+  data() {
+    return {
+      fmt,
+      fmtPct,
+      refreshOutline,
+      warningOutline,
+    };
   },
 
   computed: {
