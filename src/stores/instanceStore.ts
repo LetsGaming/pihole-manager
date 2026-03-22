@@ -36,6 +36,13 @@ interface InstanceStoreState {
   /** Consecutive failure count per instance — not persisted */
   _failCount: Record<string, number>;
   _pollHandle: ReturnType<typeof setInterval> | null;
+  /**
+   * Blocking status that was just confirmed by a toggle API call.
+   * refreshInstance will preserve this value instead of overwriting it with
+   * a potentially stale getSummary response, then clear it once the Pi-hole
+   * confirms the same state on the next poll.
+   */
+  _lockedStatus: Record<string, "enabled" | "disabled">;
 }
 
 interface PersistedState {
@@ -52,6 +59,7 @@ export const useInstanceStore = defineStore("instances", {
     loading: {},
     _failCount: {},
     _pollHandle: null,
+    _lockedStatus: {},
   }),
 
   getters: {
@@ -228,8 +236,23 @@ export const useInstanceStore = defineStore("instances", {
       try {
         const summary = await PiholeApiService.getSummary(instance);
 
+        // If a toggle just confirmed a specific status, preserve it rather than
+        // overwriting with the getSummary response, which may still reflect the
+        // old state due to Pi-hole propagation delay.
+        // Once the Pi-hole itself agrees with the locked status, clear the lock.
+        const locked = this._lockedStatus[id];
+        const resolvedStatus = locked !== undefined ? locked : summary.status;
+        if (locked !== undefined && summary.status === locked) {
+          // Pi-hole confirmed the toggled state — release the lock
+          const { [id]: _, ...rest } = this._lockedStatus;
+          this._lockedStatus = rest;
+        }
+
         // Immutably update summaryData so Vue detects the change
-        this.summaryData = { ...this.summaryData, [id]: summary };
+        this.summaryData = {
+          ...this.summaryData,
+          [id]: { ...summary, status: resolvedStatus },
+        };
 
         // Reset failure counter and mark online
         this._failCount = { ...this._failCount, [id]: 0 };
@@ -254,6 +277,22 @@ export const useInstanceStore = defineStore("instances", {
       );
     },
 
+    /**
+     * Immutably patch only the blocking status field inside summaryData for
+     * one instance. Used for optimistic UI updates before the re-fetch confirms.
+     */
+    _patchSummaryStatus(id: string, blockingStatus: "enabled" | "disabled"): void {
+      // Lock this status so refreshInstance won't overwrite it with a stale
+      // poll response until the Pi-hole itself confirms the new state.
+      this._lockedStatus = { ...this._lockedStatus, [id]: blockingStatus };
+      const existing = this.summaryData[id];
+      if (!existing) return; // no summary yet — nothing to patch
+      this.summaryData = {
+        ...this.summaryData,
+        [id]: { ...existing, status: blockingStatus },
+      };
+    },
+
     /** Immutably update the status field of a single instance. */
     _setStatus(id: string, status: PiholeInstance["status"]): void {
       const idx = this.instances.findIndex((i) => i.id === id);
@@ -268,15 +307,20 @@ export const useInstanceStore = defineStore("instances", {
     async enableBlocking(id: string): Promise<void> {
       const inst = this.instances.find((i) => i.id === id);
       if (!inst) throw new Error("Instance not found");
-      await PiholeApiService.enableBlocking(inst);
-      await this.refreshInstance(id);
+      this._patchSummaryStatus(id, "enabled");           // optimistic
+      const result = await PiholeApiService.enableBlocking(inst);
+      this._patchSummaryStatus(id, result.status);       // confirmed by POST response
+      // No immediate refreshInstance — _lockedStatus protects against stale polls.
+      // Stats numbers (query counts etc.) will sync on the next 30 s poll.
     },
 
     async disableBlocking(id: string, seconds = 0): Promise<void> {
       const inst = this.instances.find((i) => i.id === id);
       if (!inst) throw new Error("Instance not found");
-      await PiholeApiService.disableBlocking(inst, seconds);
-      await this.refreshInstance(id);
+      this._patchSummaryStatus(id, "disabled");          // optimistic
+      const result = await PiholeApiService.disableBlocking(inst, seconds);
+      this._patchSummaryStatus(id, result.status);       // confirmed by POST response
+      // No immediate refreshInstance — _lockedStatus protects against stale polls.
     },
 
     async enableAllBlocking(): Promise<void> {

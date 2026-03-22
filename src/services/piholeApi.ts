@@ -222,6 +222,9 @@ const PiholeApiService = {
   async getSummary(instance: PiholeInstance): Promise<PiholeSummary> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
+        // Both requests share the same authenticated session from v6Call.
+        // Do NOT catch the blocking request silently — a swallowed auth error
+        // would always default to "enabled" and mask the real problem.
         const [summaryRes, blockingRes] = await Promise.all([
           client.get<{
             queries: {
@@ -234,18 +237,11 @@ const PiholeApiService = {
             clients: { active: number; total: number };
             gravity: { domains_being_blocked: number; last_update?: number };
           }>("/api/stats/summary"),
-          client
-            .get<{ blocking: boolean }>("/api/dns/blocking")
-            .catch(() => ({ data: { blocking: true } })),
+          client.get<{ blocking: boolean }>("/api/dns/blocking"),
         ]);
         const d = summaryRes.data;
         return {
-          status:
-            d.gravity !== undefined
-              ? blockingRes.data.blocking
-                ? "enabled"
-                : "disabled"
-              : "enabled",
+          status: blockingRes.data.blocking ? "enabled" : "disabled",
           dns_queries_today: d.queries.total,
           ads_blocked_today: d.queries.blocked,
           ads_percentage_today: d.queries.percent_blocked,
@@ -262,11 +258,14 @@ const PiholeApiService = {
         } as PiholeSummary;
       });
     }
-    const { data } = await v5Client(instance).get<PiholeSummary>(
-      "/admin/api.php",
-      { params: { summary: "" } },
-    );
-    return data;
+    // v5: ?summary does NOT include a blocking status field — fetch ?status
+    // in parallel and merge so summaryData.status is always accurate.
+    const client = v5Client(instance);
+    const [summaryRes, statusRes] = await Promise.all([
+      client.get<PiholeSummary>("/admin/api.php", { params: { summary: "" } }),
+      client.get<{ status: BlockingStatus }>("/admin/api.php", { params: { status: "" } }),
+    ]);
+    return { ...summaryRes.data, status: statusRes.data.status };
   },
 
   async getStatus(
@@ -292,8 +291,12 @@ const PiholeApiService = {
   ): Promise<{ status: BlockingStatus }> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        await client.post("/api/dns/blocking", { blocking: true });
-        return { status: "enabled" as BlockingStatus };
+        // POST returns { blocking: bool, timer: null } — use it as ground truth
+        const { data } = await client.post<{ blocking: boolean }>(
+          "/api/dns/blocking",
+          { blocking: true },
+        );
+        return { status: data.blocking ? "enabled" : "disabled" };
       });
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
@@ -311,8 +314,12 @@ const PiholeApiService = {
       return v6Call(instance, async (client) => {
         const body: Record<string, unknown> = { blocking: false };
         if (seconds > 0) body.timer = seconds;
-        await client.post("/api/dns/blocking", body);
-        return { status: "disabled" as BlockingStatus };
+        // POST returns { blocking: bool, timer: null } — use it as ground truth
+        const { data } = await client.post<{ blocking: boolean }>(
+          "/api/dns/blocking",
+          body,
+        );
+        return { status: data.blocking ? "enabled" : "disabled" };
       });
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(

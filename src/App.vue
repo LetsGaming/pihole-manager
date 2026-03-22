@@ -12,14 +12,14 @@
                     cy="20"
                     r="18"
                     fill="none"
-                    stroke="var(--accent-cyan)"
+                    stroke="var(--accent)"
                     stroke-width="2"
                   />
                   <circle
                     cx="20"
                     cy="20"
                     r="8"
-                    fill="var(--accent-cyan)"
+                    fill="var(--accent)"
                     opacity="0.3"
                   />
                   <line
@@ -27,7 +27,7 @@
                     y1="2"
                     x2="20"
                     y2="38"
-                    stroke="var(--accent-cyan)"
+                    stroke="var(--accent)"
                     stroke-width="1"
                     opacity="0.5"
                   />
@@ -36,11 +36,11 @@
                     y1="20"
                     x2="38"
                     y2="20"
-                    stroke="var(--accent-cyan)"
+                    stroke="var(--accent)"
                     stroke-width="1"
                     opacity="0.5"
                   />
-                  <circle cx="20" cy="20" r="3" fill="var(--accent-cyan)" />
+                  <circle cx="20" cy="20" r="3" fill="var(--accent)" />
                 </svg>
               </div>
               <div class="brand-text">

@@ -54,22 +54,8 @@
           </div>
         </div>
 
-        <!-- Per-instance cards -->
-        <div class="instance-cards-grid">
-          <InstanceCard
-            v-for="inst in instanceStore.instances"
-            :key="inst.id"
-            :instance="inst"
-            :summary="instanceStore.summaryData[inst.id] ?? null"
-            :loading="instanceStore.loading[inst.id] ?? false"
-            :error="instanceStore.errors[inst.id] ?? null"
-            @refresh="instanceStore.refreshInstance"
-            @toggle-blocking="onToggleBlocking"
-          />
-        </div>
-
         <!-- Aggregate stats — reuses StatsOverviewCards for consistent design -->
-        <div class="section-label">AGGREGATE — ALL INSTANCES</div>
+        <div class="section-label stats-overview-label">AGGREGATE — ALL INSTANCES</div>
         <StatsOverviewCards :summary="aggregateSummary" aggregate-mode>
           <template #extra-cards>
             <StatCard
@@ -87,6 +73,20 @@
             />
           </template>
         </StatsOverviewCards>
+
+        <!-- Per-instance cards -->
+        <div class="instance-cards-grid">
+          <InstanceCard
+            v-for="inst in instanceStore.instances"
+            :key="inst.id"
+            :instance="inst"
+            :summary="instanceStore.summaryData[inst.id] ?? null"
+            :loading="instanceStore.loading[inst.id] ?? false"
+            :error="instanceStore.errors[inst.id] ?? null"
+            @refresh="instanceStore.refreshInstance"
+            @toggle-blocking="onToggleBlocking"
+          />
+        </div>
       </template>
     </ion-content>
 
@@ -263,15 +263,20 @@ export default defineComponent({
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 12px 16px;
-  margin-bottom: 20px;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
   flex-wrap: wrap;
-  gap: 10px;
+  gap: var(--space-3);
+  box-shadow: var(--shadow-sm);
 }
+.stats-overview-label {
+  padding-top: 8px !important;
+}
+
 .instance-cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--space-4);
+  margin-top: var(--space-6);
 }
 </style>

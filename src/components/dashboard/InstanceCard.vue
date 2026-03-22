@@ -1,87 +1,80 @@
 <template>
-  <div class="instance-overview-card" :class="instance.status">
+  <div class="instance-card" :class="instance.status">
     <!-- Header -->
-    <div class="ioc-header">
-      <div class="flex items-center gap-2">
+    <div class="ic-header">
+      <div class="ic-header-left">
         <div class="instance-status-dot" :class="`status-${instance.status}`" />
-        <span class="ioc-name">{{ instance.name }}</span>
+        <span class="ic-name">{{ instance.name }}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="badge" :class="blockingBadgeClass">{{
-          blockingLabel
-        }}</span>
+      <div class="ic-header-right">
+        <span class="badge" :class="blockingBadgeClass">{{ blockingLabel }}</span>
         <button
-          class="btn btn-ghost btn-sm btn-icon"
+          class="btn btn-ghost btn-icon btn-sm"
           :disabled="loading"
+          :aria-label="`Refresh ${instance.name}`"
           title="Refresh"
           @click="$emit('refresh', instance.id)"
         >
-          <ion-icon :icon="refreshOutline" style="font-size: 14px" />
+          <ion-icon :icon="refreshOutline" style="font-size: 13px" />
         </button>
       </div>
     </div>
 
     <!-- Offline -->
-    <div v-if="instance.status === 'offline'" class="ioc-offline">
-      <ion-icon :icon="warningOutline" />
+    <div v-if="instance.status === 'offline'" class="ic-offline">
+      <ion-icon :icon="warningOutline" aria-hidden="true" />
       <span>{{ error || "Cannot connect" }}</span>
     </div>
 
     <!-- Loading skeleton -->
-    <div v-else-if="loading && !summary" class="ioc-skeleton">
-      <div
-        class="skeleton"
-        style="height: 20px; width: 60%; margin-bottom: 8px"
-      />
-      <div class="skeleton" style="height: 20px; width: 40%" />
+    <div v-else-if="loading && !summary" class="ic-skeleton">
+      <div class="skeleton" style="height: 18px; width: 55%; margin-bottom: 8px" />
+      <div class="skeleton" style="height: 18px; width: 38%" />
     </div>
 
     <!-- Stats -->
     <template v-else-if="summary">
-      <div class="ioc-stats">
-        <div class="ioc-stat">
-          <div class="ioc-stat-label">QUERIES TODAY</div>
-          <div class="ioc-stat-value">{{ fmt(summary.dns_queries_today) }}</div>
+      <div class="ic-stats">
+        <div class="ic-stat">
+          <div class="ic-stat-label">Queries</div>
+          <div class="ic-stat-value">{{ fmt(summary.dns_queries_today) }}</div>
         </div>
-        <div class="ioc-stat">
-          <div class="ioc-stat-label">BLOCKED</div>
-          <div class="ioc-stat-value red">
+        <div class="ic-stat">
+          <div class="ic-stat-label">Blocked</div>
+          <div class="ic-stat-value" style="color: var(--color-red)">
             {{ fmt(summary.ads_blocked_today) }}
           </div>
         </div>
-        <div class="ioc-stat">
-          <div class="ioc-stat-label">BLOCK RATE</div>
-          <div class="ioc-stat-value cyan">
+        <div class="ic-stat">
+          <div class="ic-stat-label">Block rate</div>
+          <div class="ic-stat-value" style="color: var(--accent)">
             {{ fmtPct(summary.ads_percentage_today) }}
           </div>
         </div>
-        <div class="ioc-stat">
-          <div class="ioc-stat-label">DOMAINS LIST</div>
-          <div class="ioc-stat-value">
-            {{ fmt(summary.domains_being_blocked) }}
-          </div>
+        <div class="ic-stat">
+          <div class="ic-stat-label">Domains</div>
+          <div class="ic-stat-value">{{ fmt(summary.domains_being_blocked) }}</div>
         </div>
       </div>
 
-      <!-- Blocking toggle -->
-      <div class="ioc-footer">
-        <div class="ioc-url text-mono text-xs text-muted truncate">
-          {{ instance.url }}
-        </div>
-        <label class="toggle toggle-wrap" style="gap: 8px; cursor: pointer">
-          <input
-            type="checkbox"
-            :checked="summary.status === 'enabled'"
-            @change="
-              $emit(
-                'toggle-blocking',
-                instance.id,
-                ($event.target as HTMLInputElement).checked,
-              )
-            "
-          />
-          <span class="toggle-track" />
-          <span class="text-xs" style="color: var(--text-muted)">Blocking</span>
+      <div class="ic-footer">
+        <span class="ic-url text-mono text-xs text-muted truncate">{{ instance.url }}</span>
+        <label class="toggle-wrap" style="cursor: pointer" :aria-label="`Toggle blocking for ${instance.name}`">
+          <span class="text-xs text-muted">Blocking</span>
+          <span class="toggle">
+            <input
+              type="checkbox"
+              :checked="summary.status === 'enabled'"
+              @change="
+                $emit(
+                  'toggle-blocking',
+                  instance.id,
+                  ($event.target as HTMLInputElement).checked,
+                )
+              "
+            />
+            <span class="toggle-track" />
+          </span>
         </label>
       </div>
     </template>
@@ -105,20 +98,15 @@ export default defineComponent({
 
   props: {
     instance: { type: Object as PropType<PiholeInstance>, required: true },
-    summary: { type: Object as PropType<PiholeSummary | null>, default: null },
-    loading: { type: Boolean, default: false },
-    error: { type: String as () => string | null, default: null },
+    summary:  { type: Object as PropType<PiholeSummary | null>, default: null },
+    loading:  { type: Boolean, default: false },
+    error:    { type: String as () => string | null, default: null },
   },
 
   emits: ["refresh", "toggle-blocking"],
 
   data() {
-    return {
-      fmt,
-      fmtPct,
-      refreshOutline,
-      warningOutline,
-    };
+    return { fmt, fmtPct, refreshOutline, warningOutline };
   },
 
   computed: {
@@ -135,93 +123,95 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.instance-overview-card {
+.instance-card {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
   transition:
-    border-color 0.2s,
-    transform 0.15s;
+    border-color var(--duration-base) var(--ease-out),
+    box-shadow   var(--duration-base) var(--ease-out),
+    transform    var(--duration-base) var(--ease-out);
 }
-.instance-overview-card:hover {
+.instance-card:hover {
   border-color: var(--border-dim);
   transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
 }
-.instance-overview-card.online {
-  border-top: 2px solid var(--status-online);
+/* Status top-stripe */
+.instance-card::before {
+  content: "";
+  display: block;
+  height: 2px;
 }
-.instance-overview-card.offline {
-  border-top: 2px solid var(--status-offline);
-  opacity: 0.7;
-}
+.instance-card.online::before  { background: var(--status-online); }
+.instance-card.offline::before { background: var(--status-offline); }
+.instance-card.offline { opacity: 0.7; }
 
-.ioc-header {
+/* Header */
+.ic-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px 10px;
+  padding: 12px var(--space-4) 10px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.ioc-name {
-  font-weight: 600;
-  font-size: 15px;
-}
-.ioc-offline {
+.ic-header-left { display: flex; align-items: center; gap: var(--space-2); }
+.ic-header-right { display: flex; align-items: center; gap: var(--space-2); }
+.ic-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+
+/* Offline */
+.ic-offline {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 20px 16px;
-  color: var(--accent-red);
+  gap: var(--space-2);
+  padding: var(--space-5) var(--space-4);
+  color: var(--color-red);
   font-size: 13px;
 }
-.ioc-skeleton {
-  padding: 16px;
-}
-.ioc-stats {
+
+/* Skeleton */
+.ic-skeleton { padding: var(--space-4); }
+
+/* Stats grid */
+.ic-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  padding: 8px 0;
 }
-.ioc-stat {
-  padding: 10px 16px;
+.ic-stat {
+  padding: 10px var(--space-4);
   border-right: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
-.ioc-stat:nth-child(even) {
-  border-right: none;
-}
-.ioc-stat:nth-last-child(-n + 2) {
-  border-bottom: none;
-}
-.ioc-stat-label {
-  font-family: var(--font-mono);
-  font-size: 9px;
+.ic-stat:nth-child(even)     { border-right: none; }
+.ic-stat:nth-last-child(-n+2) { border-bottom: none; }
+
+.ic-stat-label {
+  font-size: 10px;
+  font-weight: 600;
   color: var(--text-muted);
-  letter-spacing: 0.1em;
   text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.ioc-stat-value {
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
   font-family: var(--font-mono);
-  font-size: 18px;
-  font-weight: 700;
 }
-.ioc-stat-value.red {
-  color: var(--accent-red);
+.ic-stat-value {
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
 }
-.ioc-stat-value.cyan {
-  color: var(--accent-cyan);
-}
-.ioc-footer {
+
+/* Footer */
+.ic-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
+  padding: 9px var(--space-4);
   background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
 }
-.ioc-url {
-  max-width: 180px;
-}
+.ic-url { max-width: 160px; }
 </style>

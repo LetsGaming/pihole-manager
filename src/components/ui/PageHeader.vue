@@ -4,7 +4,7 @@
       <ion-buttons slot="start">
         <ion-menu-button />
       </ion-buttons>
-      <div slot="start" class="page-title" style="margin-left: 8px">
+      <div slot="start" class="page-title" style="margin-left: 6px">
         {{ title }}
       </div>
       <ion-buttons slot="end">

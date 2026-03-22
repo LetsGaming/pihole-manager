@@ -34,3 +34,26 @@ export default defineComponent({
   },
 });
 </script>
+
+<style scoped>
+.hw-metric-card {
+  padding: var(--space-4);
+  border-right: 1px solid var(--border-subtle);
+}
+.hw-metric-card:last-child { border-right: none; }
+.hw-metric-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: var(--space-1);
+}
+.hw-metric-value {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+</style>

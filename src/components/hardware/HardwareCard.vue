@@ -210,63 +210,15 @@ export default defineComponent({
 </script>
 
 <style scoped>
-.hw-instance-card {
-  padding: 0;
-  overflow: hidden;
-}
-.hw-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.hw-loading {
-  padding: 20px;
-}
-.hw-metrics-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  border-bottom: 1px solid var(--border-subtle);
-}
-.hw-info-table {
-  border-top: 1px solid var(--border-subtle);
-}
-.hw-info-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  gap: 12px;
-}
-.hw-info-row:last-child {
-  border-bottom: none;
-}
-.hw-info-label {
-  font-size: 12px;
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.hw-info-value {
-  font-size: 13px;
-  text-align: right;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.hw-info-value.mono {
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
-.ioc-offline {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 20px;
-  color: var(--accent-red);
-  font-size: 13px;
-}
+.hw-instance-card { padding: 0; overflow: hidden; }
+.hw-card-header { display: flex; align-items: center; justify-content: space-between; padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; gap: var(--space-2); }
+.hw-loading { padding: var(--space-5); }
+.hw-metrics-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); border-bottom: 1px solid var(--border-subtle); }
+.hw-info-table { border-top: 1px solid var(--border-subtle); }
+.hw-info-row { display: flex; align-items: center; justify-content: space-between; padding: 8px var(--space-5); border-bottom: 1px solid var(--border-subtle); gap: var(--space-3); }
+.hw-info-row:last-child { border-bottom: none; }
+.hw-info-label { font-size: 12px; color: var(--text-muted); flex-shrink: 0; }
+.hw-info-value { font-size: 13px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hw-info-value.mono { font-family: var(--font-mono); font-size: 12px; }
+.ioc-offline { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-5); color: var(--color-red); font-size: 13px; }
 </style>
