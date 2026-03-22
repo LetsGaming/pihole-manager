@@ -27,12 +27,13 @@
       </EmptyState>
 
       <template v-else>
+        <!-- Global blocking control bar -->
         <div class="global-controls-bar">
           <div class="flex items-center gap-2">
             <span class="section-label" style="padding: 0">GLOBAL CONTROL</span>
-            <span class="badge" :class="globalStatusBadgeClass">{{
-              globalStatusLabel
-            }}</span>
+            <span class="badge" :class="globalStatusBadgeClass">
+              {{ globalStatusLabel }}
+            </span>
           </div>
           <div class="flex items-center gap-2">
             <button
@@ -53,6 +54,7 @@
           </div>
         </div>
 
+        <!-- Per-instance cards -->
         <div class="instance-cards-grid">
           <InstanceCard
             v-for="inst in instanceStore.instances"
@@ -60,44 +62,31 @@
             :instance="inst"
             :summary="instanceStore.summaryData[inst.id] ?? null"
             :loading="instanceStore.loading[inst.id] ?? false"
-            :error="instanceStore.errors[inst.id] ?? undefined"
+            :error="instanceStore.errors[inst.id] ?? null"
             @refresh="instanceStore.refreshInstance"
             @toggle-blocking="onToggleBlocking"
           />
         </div>
 
+        <!-- Aggregate stats — reuses StatsOverviewCards for consistent design -->
         <div class="section-label">AGGREGATE — ALL INSTANCES</div>
-        <div class="stat-grid">
-          <StatCard
-            label="Total Queries"
-            :value="fmt(aggregate.totalQueries)"
-          />
-          <StatCard
-            label="Total Blocked"
-            :value="fmt(aggregate.totalBlocked)"
-            accent="red"
-          />
-          <StatCard
-            label="Avg Block Rate"
-            :value="aggregate.avgBlockRate"
-            accent="cyan"
-          />
-          <StatCard
-            label="Domains in Lists"
-            :value="fmt(aggregate.totalDomainsBlocked)"
-            accent="purple"
-          />
-          <StatCard
-            label="Online Instances"
-            :value="`${instanceStore.onlineCount} / ${instanceStore.instances.length}`"
-            accent="green"
-          />
-          <StatCard
-            label="Unique Clients"
-            :value="fmt(aggregate.uniqueClients)"
-            accent="amber"
-          />
-        </div>
+        <StatsOverviewCards :summary="aggregateSummary" aggregate-mode>
+          <template #extra-cards>
+            <StatCard
+              label="Online Instances"
+              :value="`${instanceStore.onlineCount} / ${instanceStore.instances.length}`"
+              accent="green"
+              :icon="wifiOutline"
+            />
+            <StatCard
+              label="Unique Clients"
+              :value="fmt(aggregate.uniqueClients)"
+              sub="combined total"
+              accent="amber"
+              :icon="desktopOutline"
+            />
+          </template>
+        </StatsOverviewCards>
       </template>
     </ion-content>
 
@@ -111,7 +100,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref } from "vue";
+import { defineComponent } from "vue";
 import { IonPage, IonContent, IonIcon } from "@ionic/vue";
 import {
   refreshOutline,
@@ -119,12 +108,17 @@ import {
   settingsOutline,
   shieldCheckmarkOutline,
   shieldOutline,
+  wifiOutline,
+  desktopOutline,
 } from "ionicons/icons";
+
 import PageHeader from "@/components/ui/PageHeader.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
 import StatCard from "@/components/ui/StatCard.vue";
+import StatsOverviewCards from "@/components/statistics/StatsOverviewCards.vue";
 import InstanceCard from "@/components/dashboard/InstanceCard.vue";
 import DisableBlockingModal from "@/components/dashboard/DisableBlockingModal.vue";
+
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useFormatting } from "@/composables/useFormatting";
 import { useBlockingControl } from "@/composables/useBlockingControl";
@@ -138,57 +132,77 @@ export default defineComponent({
     PageHeader,
     EmptyState,
     StatCard,
+    StatsOverviewCards,
     InstanceCard,
     DisableBlockingModal,
   },
 
-  setup() {
-    const instanceStore = useInstanceStore();
+  data() {
     const { fmt } = useFormatting();
-    const { toggleBlocking, enableAll, disableAll } = useBlockingControl();
-    const showDisableModal = ref(false);
+    return {
+      showDisableModal: false,
+      fmt,
+      // Icon refs for template
+      refreshOutline,
+      addCircleOutline,
+      settingsOutline,
+      shieldCheckmarkOutline,
+      shieldOutline,
+      wifiOutline,
+      desktopOutline,
+    };
+  },
 
-    const anyLoading = computed(() =>
-      Object.values(instanceStore.loading).some(Boolean),
-    );
+  computed: {
+    instanceStore() {
+      return useInstanceStore();
+    },
 
-    const globalStatusLabel = computed(() => {
-      const s = instanceStore.globalBlockingStatus;
-      return s === "enabled"
-        ? "All Blocking"
-        : s === "disabled"
-          ? "All Disabled"
-          : s === "mixed"
-            ? "Mixed"
-            : "Unknown";
-    });
+    anyLoading(): boolean {
+      return Object.values(this.instanceStore.loading).some(Boolean);
+    },
 
-    const globalStatusBadgeClass = computed(() => {
-      const s = instanceStore.globalBlockingStatus;
-      return s === "enabled"
-        ? "badge-green"
-        : s === "disabled"
-          ? "badge-red"
-          : "badge-amber";
-    });
+    globalStatusLabel(): string {
+      const s = this.instanceStore.globalBlockingStatus;
+      if (s === "enabled") return "All Blocking";
+      if (s === "disabled") return "All Disabled";
+      if (s === "mixed") return "Mixed";
+      return "Unknown";
+    },
 
-    const aggregate = computed(() => {
-      let totalQueries = 0,
-        totalBlocked = 0,
-        totalDomainsBlocked = 0,
-        uniqueClients = 0;
-      instanceStore.instances.forEach((inst) => {
-        const s = instanceStore.summaryData[inst.id];
+    globalStatusBadgeClass(): string {
+      const s = this.instanceStore.globalBlockingStatus;
+      if (s === "enabled") return "badge-green";
+      if (s === "disabled") return "badge-red";
+      return "badge-amber";
+    },
+
+    aggregate(): {
+      totalQueries: number;
+      totalBlocked: number;
+      totalDomainsBlocked: number;
+      uniqueClients: number;
+      avgBlockRate: string;
+    } {
+      let totalQueries = 0;
+      let totalBlocked = 0;
+      let totalDomainsBlocked = 0;
+      let uniqueClients = 0;
+
+      this.instanceStore.instances.forEach((inst) => {
+        const s = this.instanceStore.summaryData[inst.id];
         if (!s) return;
         totalQueries += Number(s.dns_queries_today) || 0;
         totalBlocked += Number(s.ads_blocked_today) || 0;
         totalDomainsBlocked += Number(s.domains_being_blocked) || 0;
         uniqueClients += Number(s.unique_clients) || 0;
       });
+
       const avgBlockRate =
         totalQueries > 0
           ? `${((totalBlocked / totalQueries) * 100).toFixed(1)}%`
           : "0%";
+
       return {
         totalQueries,
         totalBlocked,
@@ -196,37 +210,50 @@ export default defineComponent({
         uniqueClients,
         avgBlockRate,
       };
-    });
+    },
 
-    instanceStore.loadFromStorage();
-    void instanceStore.refreshAll();
-    instanceStore.startPolling();
-
-    return {
-      instanceStore,
-      aggregate,
-      anyLoading,
-      globalStatusLabel,
-      globalStatusBadgeClass,
-      showDisableModal,
-      fmt,
-      refreshAll: () => instanceStore.refreshAll(),
-      onToggleBlocking: (id: string, en: boolean) => toggleBlocking(id, en),
-      onEnableAll: () => enableAll(),
-      onDisableAll: (secs: number) => {
-        showDisableModal.value = false;
-        void disableAll(secs);
-      },
-      refreshOutline,
-      addCircleOutline,
-      settingsOutline,
-      shieldCheckmarkOutline,
-      shieldOutline,
-    };
+    /**
+     * PiholeSummary-shaped object fed into StatsOverviewCards so the Dashboard
+     * reuses the exact same component and design as the Statistics view.
+     * The last two cards (Online Instances, Unique Clients) are overridden
+     * via the #extra-cards slot.
+     */
+    aggregateSummary() {
+      const { totalQueries, totalBlocked, totalDomainsBlocked, avgBlockRate } =
+        this.aggregate;
+      const blockPct = parseFloat(avgBlockRate);
+      return {
+        status: "enabled" as const,
+        dns_queries_today: totalQueries,
+        ads_blocked_today: totalBlocked,
+        ads_percentage_today: isNaN(blockPct) ? 0 : blockPct,
+        domains_being_blocked: totalDomainsBlocked,
+        unique_clients: 0, // overridden by slot
+        queries_cached: 0, // overridden by slot
+      };
+    },
   },
 
-  beforeUnmount() {
-    useInstanceStore().stopPolling();
+  methods: {
+    refreshAll(): void {
+      void this.instanceStore.refreshAll();
+    },
+
+    onToggleBlocking(id: string, enable: boolean): void {
+      const { toggleBlocking } = useBlockingControl();
+      void toggleBlocking(id, enable);
+    },
+
+    onEnableAll(): void {
+      const { enableAll } = useBlockingControl();
+      void enableAll();
+    },
+
+    onDisableAll(secs: number): void {
+      this.showDisableModal = false;
+      const { disableAll } = useBlockingControl();
+      void disableAll(secs);
+    },
   },
 });
 </script>

@@ -1,108 +1,182 @@
 # Testing
 
+Orbital uses **Vitest** as the test runner and **Vue Test Utils** for component mounting.
+
 ## Running Tests
 
 ```bash
-npm test                  # run once
-npm run test:watch        # watch mode
-npm run test:coverage     # HTML coverage report in coverage/
-npm run typecheck         # TypeScript type check (no emit)
+# All tests
+npm test
+
+# Watch mode
+npm run test:watch
+
+# Coverage report
+npm run test:coverage
+
+# Specific file
+npx vitest run src/tests/unit/instanceStore.test.ts
 ```
 
 ## Test Structure
 
 ```
 src/tests/
-├── setup.ts                        # Ionic stubs, localStorage + clipboard mocks
+├── components/              # Component-level tests (shallow rendering)
+│   ├── StatisticsView.test.ts
+│   ├── DashboardView.test.ts
+│   └── ...
+├── integration/
+│   ├── multiInstance.test.ts
+│   └── router.test.ts
 ├── unit/
-│   ├── instanceStore.test.js       # Store CRUD, polling, getters, persistence
-│   ├── notificationStore.test.js   # Toast queue, auto-dismiss
-│   ├── piholeApi.test.js           # Core API methods (axios mocked)
-│   ├── piholeApiExtended.test.js   # Query log, lists, auth headers, formatters
-│   └── hardwareService.test.js     # Parsers, formatters, severity helpers
-├── components/
-│   ├── DashboardView.test.js
-│   ├── QueryLogView.test.js
-│   ├── BlockListsView.test.js
-│   ├── StatisticsView.test.js
-│   ├── HardwareView.test.js
-│   ├── SettingsView.test.js
-│   └── DocsView.test.js
-└── integration/
-    ├── multiInstance.test.js       # Realistic multi-instance workflows
-    └── router.test.js              # Route definitions, redirects, titles
+│   ├── instanceStore.test.ts
+│   ├── notificationStore.test.ts
+│   ├── piholeApi.test.ts
+│   └── ...
+└── setup.ts                 # Global mocks (localStorage, Ionic stubs)
 ```
 
-**267 tests** across 14 files, three layers:
+## Mocking Strategy
 
-| Layer | Strategy |
+### API service
+
+`piholeApi` is fully mocked in component tests. Mock data is inlined to avoid shared state:
+
+```ts
+vi.mock("@/services/piholeApi", () => ({
+  default: {
+    getSummary: vi.fn().mockResolvedValue({
+      status: "enabled",
+      dns_queries_today: 5000,
+      ads_blocked_today: 750,
+      ads_percentage_today: 15.0,
+      domains_being_blocked: 120000,
+      unique_clients: 8,
+      queries_cached: 1200,
+    }),
+    getOverTimeData: vi.fn().mockResolvedValue({ domains: {}, ads: {} }),
+    // ...
+  },
+}));
+```
+
+### Chart.js
+
+Chart.js is mocked to avoid canvas errors in jsdom:
+
+```ts
+vi.mock("chart.js", () => ({
+  Chart: Object.assign(
+    vi.fn().mockImplementation(() => ({ destroy: vi.fn(), update: vi.fn() })),
+    { register: vi.fn() },
+  ),
+  registerables: [],
+}));
+```
+
+### Ionic components
+
+All Ionic components are stubbed in component tests:
+
+```ts
+const STUBS = {
+  "ion-page":    { template: '<div class="ion-page"><slot /></div>' },
+  "ion-content": { template: '<div class="ion-content"><slot /></div>' },
+  // ...
+};
+```
+
+### Sub-components
+
+`StatisticsView` tests stub its extracted sub-components to keep tests isolated:
+
+```ts
+StatsOverviewCards: { template: '<div class="stats-overview-cards"></div>', props: ["summary"] },
+StatsChart:         { template: '<div class="stats-chart"></div>',          props: ["overTimeData", "loading", "instanceName"] },
+TopDomainsCard:     { template: '<div class="top-domains-card">{{ title }}</div>', props: ["title", "domains", "loading", "variant", "emptyMessage"] },
+```
+
+## instanceStore Tests
+
+The store tests cover:
+
+| Area | Tests |
 |---|---|
-| Unit — stores | Pinia store isolated; `piholeApi` mocked with `vi.mock` |
-| Unit — services | `axios` mocked; all API paths exercised |
-| Component | Ionic stubs global; real Pinia; test rendering + interactions |
-| Integration | `axios` mocked at HTTP boundary; full store+service workflows |
+| `addInstance` | ID generation, active instance, URL trimming, localStorage persistence, reactive map initialisation |
+| `updateInstance` | Field updates, fail counter reset, error on unknown ID |
+| `removeInstance` | Array removal, cleanup of all reactive maps, active promotion |
+| `refreshInstance` | Online status, summary stored reactively, error handling, resilience (threshold), recovery |
+| Blocking control | `enableBlocking`, `disableBlocking`, `enableAllBlocking` |
+| Getters | `onlineCount`, `offlineCount`, `sortedInstances`, `globalBlockingStatus` |
+| Persistence | `loadFromStorage`, transient state init, corrupted data |
+| Polling | Interval fires, stop prevents calls, no double-polling |
+
+### Reactive update assertions
+
+Tests verify that `summaryData` is replaced (not mutated) after `refreshInstance`:
+
+```ts
+const before = store.summaryData;
+await store.refreshInstance(id);
+expect(store.summaryData).not.toBe(before); // new object reference
+expect(store.summaryData[id]).toBeDefined();
+```
+
+## StatisticsView Tests
+
+| Area | Tests |
+|---|---|
+| Empty state | Shown when no instances |
+| Default view | `__all__` selected when multiple instances; single instance selected when only one |
+| Selector | "All Instances" option present; instance names rendered |
+| `aggregateSummary` | Sums queries/blocked/clients/cached; null when no data; correct block rate |
+| `currentSummary` | Returns data for selected instance; null in `__all__` mode |
+| Loading states | `isLoadingCharts` forwarded to `StatsChart` |
+| Formatting | `fmt(null)` → `"—"`, number formatting, `fmtPct` |
 
 ## Writing New Tests
 
-### Unit test (store action)
+### Component test template
 
 ```ts
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { setActivePinia, createPinia } from 'pinia';
-import { useInstanceStore } from '../../stores/instanceStore';
+import { describe, it, expect, vi } from "vitest";
+import { mount } from "@vue/test-utils";
+import { createPinia, setActivePinia } from "pinia";
+import MyView from "@/views/MyView.vue";
+import { useInstanceStore } from "@/stores/instanceStore";
 
-vi.mock('../../services/piholeApi', () => ({
-  default: { getSummary: vi.fn() },
-}));
+vi.mock("@/services/piholeApi", () => ({ default: { /* ... */ } }));
 
-describe('myNewAction', () => {
-  beforeEach(() => setActivePinia(createPinia()));
-
-  it('does what it says', async () => {
-    const store = useInstanceStore();
-    // arrange → act → assert
-  });
-});
-```
-
-### Component test
-
-```ts
-import { mount } from '@vue/test-utils';
-import { createPinia, setActivePinia } from 'pinia';
-import MyView from '../../views/MyView.vue';
+const STUBS = { /* Ionic + child component stubs */ };
 
 function createWrapper() {
-  setActivePinia(createPinia());
-  // Ionic stubs are applied globally via setup.ts
-  return mount(MyView, { global: { plugins: [createPinia()] } });
+  const pinia = createPinia();
+  setActivePinia(pinia);
+  return mount(MyView, { global: { plugins: [pinia], stubs: STUBS } });
 }
 
-it('renders something', async () => {
-  const w = createWrapper();
-  await w.vm.$nextTick();
-  expect(w.text()).toContain('Expected text');
+describe("MyView", () => {
+  it("renders correctly", async () => {
+    const w = createWrapper();
+    await w.vm.$nextTick();
+    // assertions
+  });
 });
 ```
 
-### Testing composables
-
-Composables that use `onBeforeUnmount` need to run inside a component:
+### Store test template
 
 ```ts
-import { defineComponent } from 'vue';
-import { mount } from '@vue/test-utils';
-import { useLivePolling } from '../../composables/useLivePolling';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { setActivePinia, createPinia } from "pinia";
+import { useInstanceStore } from "@/stores/instanceStore";
 
-it('stops on unmount', () => {
-  const cb = vi.fn();
-  const Wrapper = defineComponent({
-    setup() { return useLivePolling(cb, 100); },
-    template: '<div />',
-  });
-  const w = mount(Wrapper);
-  w.unmount();
-  vi.advanceTimersByTime(300);
-  expect(cb).not.toHaveBeenCalledAfter(/* unmount */);
+vi.mock("@/services/piholeApi", () => ({ default: { getSummary: vi.fn() } }));
+import PiholeApiService from "@/services/piholeApi";
+
+beforeEach(() => {
+  setActivePinia(createPinia());
+  vi.mocked(PiholeApiService.getSummary).mockResolvedValue(/* VALID_SUMMARY */);
 });
 ```

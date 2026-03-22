@@ -1,5 +1,5 @@
 <template>
-  <ion-app>
+  <ion-app :data-theme="theme">
     <ion-split-pane content-id="main-content" when="lg">
       <ion-menu content-id="main-content" type="overlay">
         <ion-header>
@@ -30,16 +30,24 @@
               :key="inst.id"
               class="instance-chip"
               :class="{ active: instanceStore.activeInstanceId === inst.id }"
+              role="button"
+              :aria-label="`Switch to ${inst.name} (${inst.status})`"
+              tabindex="0"
               @click="instanceStore.setActiveInstance(inst.id)"
+              @keydown.enter="instanceStore.setActiveInstance(inst.id)"
             >
               <div class="instance-status-dot" :class="`status-${inst.status}`" />
               <span class="instance-chip-name">{{ inst.name }}</span>
             </div>
-            <div class="section-label mt-2">ALL INSTANCES</div>
+            <div class="section-label mt-2">NAVIGATE</div>
           </div>
 
           <ion-list lines="none" class="nav-list">
-            <ion-menu-toggle v-for="item in navItems" :key="item.path" :auto-hide="false">
+            <ion-menu-toggle
+              v-for="item in navItems"
+              :key="item.path"
+              :auto-hide="false"
+            >
               <ion-item
                 :router-link="item.path"
                 router-direction="root"
@@ -61,7 +69,17 @@
                 <span class="count-err">{{ instanceStore.offlineCount }} offline</span>
               </span>
             </div>
-            <div class="app-version">v2.0.0</div>
+            <div class="sidebar-footer-actions">
+              <span class="app-version">v2.0.0</span>
+              <button
+                class="theme-toggle-btn"
+                :aria-label="`Switch to ${isDark ? 'light' : 'dark'} mode`"
+                :title="`Switch to ${isDark ? 'light' : 'dark'} mode`"
+                @click="toggleTheme"
+              >
+                {{ isDark ? '☀️' : '🌙' }}
+              </button>
+            </div>
           </div>
         </ion-content>
       </ion-menu>
@@ -76,42 +94,77 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent } from "vue";
 import {
   IonApp, IonSplitPane, IonMenu, IonHeader, IonToolbar,
   IonContent, IonList, IonItem, IonLabel, IonIcon,
   IonMenuToggle, IonRouterOutlet,
-} from '@ionic/vue';
+} from "@ionic/vue";
 import {
   gridOutline, listOutline, shieldOutline, hardwareChipOutline,
   settingsOutline, bookOutline, statsChartOutline,
-} from 'ionicons/icons';
-import { useRoute } from 'vue-router';
-import { useInstanceStore } from '@/stores/instanceStore';
-import ToastContainer from '@/components/ToastContainer.vue';
+} from "ionicons/icons";
+import { useRoute } from "vue-router";
+import { useInstanceStore } from "@/stores/instanceStore";
+import ToastContainer from "@/components/ToastContainer.vue";
+
+const THEME_KEY = "orbital_theme";
 
 export default defineComponent({
-  name: 'App',
+  name: "App",
   components: {
     IonApp, IonSplitPane, IonMenu, IonHeader, IonToolbar,
     IonContent, IonList, IonItem, IonLabel, IonIcon,
     IonMenuToggle, IonRouterOutlet, ToastContainer,
   },
 
-  setup() {
+  data() {
+    const savedTheme = (localStorage.getItem(THEME_KEY) as "dark" | "light") ?? "dark";
     return {
-      instanceStore: useInstanceStore(),
-      route: useRoute(),
+      theme: savedTheme as "dark" | "light",
       navItems: [
-        { path: '/dashboard',  label: 'Dashboard',     icon: gridOutline },
-        { path: '/query-log',  label: 'Query Log',     icon: listOutline },
-        { path: '/blocklists', label: 'Block Lists',   icon: shieldOutline },
-        { path: '/hardware',   label: 'Hardware',      icon: hardwareChipOutline },
-        { path: '/statistics', label: 'Statistics',    icon: statsChartOutline },
-        { path: '/settings',   label: 'Settings',      icon: settingsOutline },
-        { path: '/docs',       label: 'Documentation', icon: bookOutline },
+        { path: "/dashboard",  label: "Dashboard",     icon: gridOutline },
+        { path: "/query-log",  label: "Query Log",     icon: listOutline },
+        { path: "/blocklists", label: "Block Lists",   icon: shieldOutline },
+        { path: "/hardware",   label: "Hardware",      icon: hardwareChipOutline },
+        { path: "/statistics", label: "Statistics",    icon: statsChartOutline },
+        { path: "/settings",   label: "Settings",      icon: settingsOutline },
+        { path: "/docs",       label: "Documentation", icon: bookOutline },
       ],
     };
+  },
+
+  computed: {
+    instanceStore() {
+      return useInstanceStore();
+    },
+    route() {
+      return useRoute();
+    },
+    isDark(): boolean {
+      return this.theme === "dark";
+    },
+  },
+
+  mounted() {
+    // Apply theme to document root for CSS variable resolution
+    document.documentElement.setAttribute("data-theme", this.theme);
+    // Bootstrap instance data
+    this.instanceStore.loadFromStorage();
+    void this.instanceStore.refreshAll();
+    this.instanceStore.startPolling();
+  },
+
+  beforeUnmount() {
+    this.instanceStore.stopPolling();
+  },
+
+  methods: {
+    toggleTheme(): void {
+      this.theme = this.theme === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", this.theme);
+      localStorage.setItem(THEME_KEY, this.theme);
+    },
   },
 });
 </script>

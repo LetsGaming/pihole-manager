@@ -7,6 +7,10 @@
  * Status resilience: an instance is only marked offline after
  * OFFLINE_THRESHOLD consecutive failed refreshes. One transient error
  * (network hiccup, slow response, tab switch) does not flip the status.
+ *
+ * Reactivity note: all per-instance state objects (summaryData, errors,
+ * loading, _failCount) are replaced via full object spread on every write
+ * so Vue's reactivity system always detects the change.
  */
 
 import { defineStore } from "pinia";
@@ -62,14 +66,13 @@ export const useInstanceStore = defineStore("instances", {
     onlineCount(state): number {
       return state.instances.filter((i) => i.status === "online").length;
     },
+
     offlineCount(state): number {
       return state.instances.filter((i) => i.status === "offline").length;
     },
 
     activeInstance(state): PiholeInstance | null {
-      return (
-        state.instances.find((i) => i.id === state.activeInstanceId) ?? null
-      );
+      return state.instances.find((i) => i.id === state.activeInstanceId) ?? null;
     },
 
     activeSummary(state): PiholeSummary | null {
@@ -80,20 +83,16 @@ export const useInstanceStore = defineStore("instances", {
     globalBlockingStatus(state): "enabled" | "disabled" | "mixed" | "unknown" {
       const online = state.instances.filter((i) => i.status === "online");
       if (online.length === 0) return "unknown";
-      const allEnabled = online.every(
-        (i) => state.summaryData[i.id]?.status === "enabled",
-      );
-      const allDisabled = online.every(
-        (i) => state.summaryData[i.id]?.status === "disabled",
-      );
-      if (allEnabled) return "enabled";
+      const allEnabled  = online.every((i) => state.summaryData[i.id]?.status === "enabled");
+      const allDisabled = online.every((i) => state.summaryData[i.id]?.status === "disabled");
+      if (allEnabled)  return "enabled";
       if (allDisabled) return "disabled";
       return "mixed";
     },
   },
 
   actions: {
-    // ── Persistence ───────────────────────────────────────────────────────────
+    // ── Persistence ─────────────────────────────────────────────────────────
 
     loadFromStorage(): void {
       try {
@@ -102,17 +101,27 @@ export const useInstanceStore = defineStore("instances", {
         const parsed = JSON.parse(raw) as PersistedState;
         this.instances = parsed.instances ?? [];
         this.activeInstanceId = parsed.activeInstanceId ?? null;
+
+        // Ensure activeInstanceId points to a real instance
         if (
           this.activeInstanceId &&
           !this.instances.find((i) => i.id === this.activeInstanceId)
         ) {
           this.activeInstanceId = this.instances[0]?.id ?? null;
         }
-        // Reset transient state on load
+
+        // Initialise transient state for every restored instance
+        const failCount: Record<string, number> = {};
+        const loading: Record<string, boolean> = {};
+        const errors: Record<string, string | null> = {};
         this.instances.forEach((i) => {
-          this._failCount[i.id] = 0;
-          // Keep persisted status as-is (prevents flash to "unknown")
+          failCount[i.id] = 0;
+          loading[i.id]   = false;
+          errors[i.id]    = null;
         });
+        this._failCount = failCount;
+        this.loading    = loading;
+        this.errors     = errors;
       } catch (err) {
         console.error("[InstanceStore] loadFromStorage failed:", err);
       }
@@ -130,7 +139,7 @@ export const useInstanceStore = defineStore("instances", {
       }
     },
 
-    // ── CRUD ──────────────────────────────────────────────────────────────────
+    // ── CRUD ────────────────────────────────────────────────────────────────
 
     addInstance(config: NewInstanceConfig): PiholeInstance {
       const instance: PiholeInstance = {
@@ -142,8 +151,14 @@ export const useInstanceStore = defineStore("instances", {
         status: "unknown",
         addedAt: new Date().toISOString(),
       };
-      this.instances.push(instance);
-      this._failCount[instance.id] = 0;
+
+      this.instances = [...this.instances, instance];
+
+      // Initialise all per-instance reactive maps with new entry
+      this._failCount = { ...this._failCount, [instance.id]: 0 };
+      this.loading    = { ...this.loading,    [instance.id]: false };
+      this.errors     = { ...this.errors,     [instance.id]: null };
+
       if (!this.activeInstanceId) this.activeInstanceId = instance.id;
       this._saveToStorage();
       void this.refreshInstance(instance.id);
@@ -153,25 +168,40 @@ export const useInstanceStore = defineStore("instances", {
     updateInstance(id: string, updates: UpdateInstanceConfig): void {
       const idx = this.instances.findIndex((i) => i.id === id);
       if (idx === -1) throw new Error(`Instance ${id} not found`);
+
       const allowed = ["name", "url", "apiToken", "apiVersion"] as const;
+      const updated = { ...this.instances[idx] };
       allowed.forEach((key) => {
         if (key in updates) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (this.instances[idx] as any)[key] = (updates as any)[key];
+          (updated as any)[key] = (updates as any)[key];
         }
       });
-      // Reset fail counter on credential change — treat as fresh instance
-      this._failCount[id] = 0;
+
+      // Replace array immutably for reactivity
+      const newInstances = [...this.instances];
+      newInstances[idx] = updated;
+      this.instances = newInstances;
+
+      // Reset fail counter so updated credentials get a fresh chance
+      this._failCount = { ...this._failCount, [id]: 0 };
       this._saveToStorage();
       void this.refreshInstance(id);
     },
 
     removeInstance(id: string): void {
       this.instances = this.instances.filter((i) => i.id !== id);
-      delete this.summaryData[id];
-      delete this.errors[id];
-      delete this.loading[id];
-      delete this._failCount[id];
+
+      // Remove from all reactive maps
+      const { [id]: _s, ...restSummary } = this.summaryData;
+      const { [id]: _e, ...restErrors  } = this.errors;
+      const { [id]: _l, ...restLoading } = this.loading;
+      const { [id]: _f, ...restFail    } = this._failCount;
+      this.summaryData = restSummary;
+      this.errors      = restErrors;
+      this.loading     = restLoading;
+      this._failCount  = restFail;
+
       if (this.activeInstanceId === id) {
         this.activeInstanceId = this.instances[0]?.id ?? null;
       }
@@ -185,31 +215,36 @@ export const useInstanceStore = defineStore("instances", {
       }
     },
 
-    // ── Data Fetching ─────────────────────────────────────────────────────────
+    // ── Data Fetching ────────────────────────────────────────────────────────
 
     async refreshInstance(id: string): Promise<void> {
       const instance = this.instances.find((i) => i.id === id);
       if (!instance) return;
 
-      this.loading[id] = true;
-      this.errors[id] = null;
+      // Mark as loading — use spread to trigger reactivity
+      this.loading = { ...this.loading, [id]: true };
+      this.errors  = { ...this.errors,  [id]: null };
 
       try {
-        this.summaryData[id] = await PiholeApiService.getSummary(instance);
-        // Success: reset failure counter and mark online
-        this._failCount[id] = 0;
+        const summary = await PiholeApiService.getSummary(instance);
+
+        // Immutably update summaryData so Vue detects the change
+        this.summaryData = { ...this.summaryData, [id]: summary };
+
+        // Reset failure counter and mark online
+        this._failCount = { ...this._failCount, [id]: 0 };
         this._setStatus(id, "online");
       } catch (err) {
-        // Increment failure counter — only go offline after OFFLINE_THRESHOLD consecutive failures
-        this._failCount[id] = (this._failCount[id] ?? 0) + 1;
-        this.errors[id] = PiholeApiService.errorMessage(err);
+        const failCount = (this._failCount[id] ?? 0) + 1;
+        this._failCount = { ...this._failCount, [id]: failCount };
+        this.errors     = { ...this.errors, [id]: PiholeApiService.errorMessage(err) };
 
-        if (this._failCount[id] >= OFFLINE_THRESHOLD) {
+        if (failCount >= OFFLINE_THRESHOLD) {
           this._setStatus(id, "offline");
         }
-        // If below threshold: keep current status (online/unknown) — don't flash offline
+        // Below threshold: keep current status — avoids false-positive offline flash
       } finally {
-        this.loading[id] = false;
+        this.loading = { ...this.loading, [id]: false };
       }
     },
 
@@ -219,12 +254,16 @@ export const useInstanceStore = defineStore("instances", {
       );
     },
 
+    /** Immutably update the status field of a single instance. */
     _setStatus(id: string, status: PiholeInstance["status"]): void {
-      const inst = this.instances.find((i) => i.id === id);
-      if (inst) inst.status = status;
+      const idx = this.instances.findIndex((i) => i.id === id);
+      if (idx === -1) return;
+      const newInstances = [...this.instances];
+      newInstances[idx] = { ...newInstances[idx], status };
+      this.instances = newInstances;
     },
 
-    // ── Blocking Control ──────────────────────────────────────────────────────
+    // ── Blocking Control ─────────────────────────────────────────────────────
 
     async enableBlocking(id: string): Promise<void> {
       const inst = this.instances.find((i) => i.id === id);
@@ -256,10 +295,10 @@ export const useInstanceStore = defineStore("instances", {
       );
     },
 
-    // ── Polling ───────────────────────────────────────────────────────────────
+    // ── Polling ──────────────────────────────────────────────────────────────
 
     startPolling(intervalMs = POLL_INTERVAL_MS): void {
-      if (this._pollHandle) return;
+      if (this._pollHandle) return; // already running
       this._pollHandle = setInterval(() => void this.refreshAll(), intervalMs);
     },
 

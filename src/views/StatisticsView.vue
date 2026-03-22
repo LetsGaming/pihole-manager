@@ -5,10 +5,12 @@
         <select
           v-model="selectedInstanceId"
           class="field-input"
-          style="width: 160px"
+          style="width: 180px"
+          aria-label="Select instance"
         >
+          <option value="__all__">All Instances</option>
           <option
-            v-for="inst in instanceStore.instances"
+            v-for="inst in instancesStore.instances"
             :key="inst.id"
             :value="inst.id"
           >
@@ -20,155 +22,124 @@
 
     <ion-content class="page-content">
       <EmptyState
-        v-if="!instanceStore.instances.length"
+        v-if="!instancesStore.instances.length"
         title="No instances configured"
+        subtitle="Go to Settings to add your first Pi-hole instance."
       />
 
       <template v-else>
-        <div class="stat-grid mb-3">
-          <StatCard
-            label="Queries Today"
-            :value="fmt(summary?.dns_queries_today)"
-          />
-          <StatCard
-            label="Blocked Today"
-            :value="fmt(summary?.ads_blocked_today)"
-            accent="red"
-          />
-          <StatCard
-            label="Block Rate"
-            :value="fmtPct(summary?.ads_percentage_today)"
-            accent="cyan"
-          />
-          <StatCard
-            label="Domains Blocked"
-            :value="fmt(summary?.domains_being_blocked)"
-            accent="purple"
-          />
-          <StatCard
-            label="Unique Clients"
-            :value="fmt(summary?.unique_clients)"
-            accent="green"
-          />
-          <StatCard
-            label="Queries Cached"
-            :value="fmt(summary?.queries_cached)"
-            accent="amber"
-          />
-        </div>
+        <!-- Stat cards — same layout for both single and all-instances -->
+        <StatsOverviewCards :summary="displaySummary" :aggregate-mode="isAllMode" />
 
-        <div class="card mb-3">
-          <div class="card-header">
-            <span class="card-title">QUERIES OVER TIME (24H)</span>
-          </div>
-          <div v-if="isLoadingCharts" class="skeleton" style="height: 200px" />
-          <canvas v-else ref="overTimeChart" style="max-height: 200px" />
-        </div>
+        <!-- Chart -->
+        <StatsChart
+          :over-time-data="overTimeData"
+          :loading="isLoadingCharts"
+          :instance-name="chartLabel"
+        />
 
+        <!-- Top domains grid -->
         <div class="two-col-grid mb-3">
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">TOP QUERIED DOMAINS</span>
-            </div>
-            <div v-if="isLoadingTop" class="p-3">
-              <div
-                v-for="i in 5"
-                :key="i"
-                class="skeleton"
-                style="height: 30px; margin-bottom: 6px"
-              />
-            </div>
-            <template v-else>
-              <TopDomainsBar
-                v-for="(count, domain) in topDomains"
-                :key="domain"
-                :domain="domain"
-                :count="count"
-                :width="barWidth(count, maxTopDomain)"
-              />
-            </template>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <span class="card-title">TOP BLOCKED DOMAINS</span>
-            </div>
-            <div v-if="isLoadingTop" class="p-3">
-              <div
-                v-for="i in 5"
-                :key="i"
-                class="skeleton"
-                style="height: 30px; margin-bottom: 6px"
-              />
-            </div>
-            <template v-else>
-              <TopDomainsBar
-                v-for="(count, domain) in topBlocked"
-                :key="domain"
-                :domain="domain"
-                :count="count"
-                :width="barWidth(count, maxTopBlocked)"
-                variant="blocked"
-              />
-              <div
-                v-if="!Object.keys(topBlocked).length"
-                class="text-muted text-sm"
-                style="padding: 12px"
-              >
-                No blocked domains yet
-              </div>
-            </template>
-          </div>
+          <TopDomainsCard
+            title="TOP QUERIED DOMAINS"
+            :domains="topDomains"
+            :loading="isLoadingTop"
+            empty-message="No queried domains yet"
+          />
+          <TopDomainsCard
+            title="TOP BLOCKED DOMAINS"
+            :domains="topBlocked"
+            :loading="isLoadingTop"
+            variant="blocked"
+            empty-message="No blocked domains yet"
+          />
         </div>
 
-        <div class="card">
-          <div class="card-header">
-            <span class="card-title">TOP CLIENTS</span>
-          </div>
-          <div v-if="isLoadingTop" class="p-3">
-            <div
-              v-for="i in 3"
-              :key="i"
-              class="skeleton"
-              style="height: 30px; margin-bottom: 6px"
-            />
-          </div>
-          <template v-else>
-            <TopDomainsBar
-              v-for="(count, client) in topClients"
-              :key="client"
-              :domain="client"
-              :count="count"
-              :width="barWidth(count, maxTopClient)"
-              variant="green"
-            />
-          </template>
-        </div>
+        <!-- Top clients -->
+        <TopDomainsCard
+          title="TOP CLIENTS"
+          :domains="topClients"
+          :loading="isLoadingTop"
+          variant="green"
+          empty-message="No client data yet"
+        />
       </template>
     </ion-content>
   </ion-page>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  computed,
-  watch,
-  onMounted,
-  onBeforeUnmount,
-} from "vue";
+import { defineComponent } from "vue";
+import { mapStores } from "pinia";
 import { IonPage, IonContent } from "@ionic/vue";
-import { Chart, registerables } from "chart.js";
 
 import PageHeader from "@/components/ui/PageHeader.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
-import StatCard from "@/components/ui/StatCard.vue";
-import TopDomainsBar from "@/components/ui/TopDomainsBar.vue";
+import StatsOverviewCards from "@/components/statistics/StatsOverviewCards.vue";
+import StatsChart from "@/components/statistics/StatsChart.vue";
+import TopDomainsCard from "@/components/statistics/TopDomainsCard.vue";
 
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useFormatting } from "@/composables/useFormatting";
 import PiholeApiService from "@/services/piholeApi";
-import type { PiholeSummary, TopDomainsMap, TopClientsMap } from "@/types/api";
+import type {
+  PiholeSummary,
+  TopDomainsMap,
+  TopClientsMap,
+  OverTimeData,
+} from "@/types/api";
+
+/**
+ * Merge multiple OverTimeData objects by summing counts per timestamp bucket.
+ * Timestamps are rounded to 10-minute intervals by Pi-hole, so buckets align
+ * across instances on the same network.
+ */
+function mergeOverTimeData(datasets: OverTimeData[]): OverTimeData {
+  const domains: Record<string, number> = {};
+  const ads: Record<string, number> = {};
+
+  for (const d of datasets) {
+    for (const [ts, count] of Object.entries(d.domains)) {
+      domains[ts] = (domains[ts] ?? 0) + count;
+    }
+    for (const [ts, count] of Object.entries(d.ads)) {
+      ads[ts] = (ads[ts] ?? 0) + count;
+    }
+  }
+
+  // Sort by timestamp so the chart renders left-to-right
+  const sortedDomains: Record<string, number> = {};
+  const sortedAds: Record<string, number> = {};
+  for (const k of Object.keys(domains).sort((a, b) => Number(a) - Number(b))) {
+    sortedDomains[k] = domains[k];
+    sortedAds[k] = ads[k] ?? 0;
+  }
+
+  return { domains: sortedDomains, ads: sortedAds };
+}
+
+/**
+ * Merge multiple domain/client maps by summing counts, then return the
+ * top N entries sorted descending. Using union of keys gives us "unique"
+ * domains/clients across all instances naturally.
+ */
+function mergeTopMaps(
+  maps: TopDomainsMap[],
+  limit = 10,
+): TopDomainsMap {
+  const merged: Record<string, number> = {};
+  for (const map of maps) {
+    for (const [key, count] of Object.entries(map)) {
+      merged[key] = (merged[key] ?? 0) + count;
+    }
+  }
+  // Sort descending and keep top N
+  return Object.fromEntries(
+    Object.entries(merged)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, limit),
+  );
+}
 
 export default defineComponent({
   name: "StatisticsView",
@@ -177,191 +148,260 @@ export default defineComponent({
     IonContent,
     PageHeader,
     EmptyState,
-    StatCard,
-    TopDomainsBar,
+    StatsOverviewCards,
+    StatsChart,
+    TopDomainsCard,
   },
 
-  setup() {
-    Chart.register(...registerables);
-    const instanceStore = useInstanceStore();
-    const { fmt, fmtPct, barWidth } = useFormatting();
-
-    const selectedInstanceId = ref<string | null>(null);
-    const summary = ref<PiholeSummary | null>(null);
-    const topDomains = ref<TopDomainsMap>({});
-    const topBlocked = ref<TopDomainsMap>({});
-    const topClients = ref<TopClientsMap>({});
-    const isLoadingCharts = ref(false);
-    const isLoadingTop = ref(false);
-    const overTimeChart = ref<HTMLCanvasElement | null>(null);
-    let chartInstance: Chart | null = null;
-
-    const currentInstance = computed(
-      () =>
-        instanceStore.instances.find(
-          (i) => i.id === selectedInstanceId.value,
-        ) ?? null,
-    );
-    const maxTopDomain = computed(() =>
-      Math.max(...Object.values(topDomains.value), 1),
-    );
-    const maxTopBlocked = computed(() =>
-      Math.max(...Object.values(topBlocked.value), 1),
-    );
-    const maxTopClient = computed(() =>
-      Math.max(...Object.values(topClients.value), 1),
-    );
-
-    async function loadData() {
-      if (!currentInstance.value) return;
-      summary.value =
-        instanceStore.summaryData[selectedInstanceId.value!] ?? null;
-      await Promise.allSettled([loadOverTime(), loadTopData()]);
-    }
-
-    async function loadOverTime() {
-      if (!currentInstance.value) return;
-      isLoadingCharts.value = true;
-      try {
-        const data = await PiholeApiService.getOverTimeData(
-          currentInstance.value,
-        );
-        renderChart(data.domains, data.ads);
-      } finally {
-        isLoadingCharts.value = false;
-      }
-    }
-
-    async function loadTopData() {
-      if (!currentInstance.value) return;
-      isLoadingTop.value = true;
-      try {
-        const [top, clients] = await Promise.all([
-          PiholeApiService.getTopDomains(currentInstance.value, 10),
-          PiholeApiService.getTopClients(currentInstance.value, 10),
-        ]);
-        topDomains.value = top.topDomains;
-        topBlocked.value = top.topBlocked;
-        topClients.value = clients;
-      } finally {
-        isLoadingTop.value = false;
-      }
-    }
-
-    function renderChart(
-      domains: Record<string, number>,
-      ads: Record<string, number>,
-    ) {
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
-      const canvas = overTimeChart.value;
-      if (!canvas) return;
-      const labels = Object.keys(domains).map((t) =>
-        new Date(parseInt(t, 10) * 1000).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-      );
-      chartInstance = new Chart(canvas, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [
-            {
-              label: "Queries",
-              data: Object.values(domains),
-              borderColor: "#22d3ee",
-              backgroundColor: "rgba(34,211,238,0.08)",
-              borderWidth: 2,
-              tension: 0.4,
-              fill: true,
-              pointRadius: 0,
-            },
-            {
-              label: "Blocked",
-              data: Object.values(ads),
-              borderColor: "#f87171",
-              backgroundColor: "rgba(248,113,113,0.06)",
-              borderWidth: 2,
-              tension: 0.4,
-              fill: true,
-              pointRadius: 0,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: true,
-          animation: false,
-          plugins: {
-            legend: {
-              labels: {
-                color: "#94a3b8",
-                font: { family: "DM Sans", size: 12 },
-              },
-            },
-          },
-          scales: {
-            x: {
-              ticks: {
-                color: "#475569",
-                maxTicksLimit: 12,
-                font: { family: "Space Mono", size: 10 },
-              },
-              grid: { color: "rgba(255,255,255,0.04)" },
-            },
-            y: {
-              beginAtZero: true,
-              ticks: {
-                color: "#475569",
-                font: { family: "Space Mono", size: 10 },
-              },
-              grid: { color: "rgba(255,255,255,0.04)" },
-            },
-          },
-        },
-      });
-    }
-
-    watch(selectedInstanceId, (id) => {
-      if (id) void loadData();
-    });
-
-    onMounted(() => {
-      instanceStore.loadFromStorage();
-      selectedInstanceId.value =
-        instanceStore.activeInstanceId ??
-        instanceStore.instances[0]?.id ??
-        null;
-      if (selectedInstanceId.value) void loadData();
-    });
-
-    onBeforeUnmount(() => {
-      if (chartInstance) {
-        chartInstance.destroy();
-        chartInstance = null;
-      }
-    });
-
+  data() {
+    const { fmt, fmtPct } = useFormatting();
     return {
-      instanceStore,
-      selectedInstanceId,
-      summary,
-      topDomains,
-      topBlocked,
-      topClients,
-      isLoadingCharts,
-      isLoadingTop,
-      overTimeChart,
-      maxTopDomain,
-      maxTopBlocked,
-      maxTopClient,
+      /** '__all__' for aggregate view, or an instance id */
+      selectedInstanceId: "__all__" as string,
+      overTimeData: null as OverTimeData | null,
+      topDomains: {} as TopDomainsMap,
+      topBlocked: {} as TopDomainsMap,
+      topClients: {} as TopClientsMap,
+      isLoadingCharts: false,
+      isLoadingTop: false,
       fmt,
       fmtPct,
-      barWidth,
     };
+  },
+
+  computed: {
+    ...mapStores(useInstanceStore),
+
+    isAllMode(): boolean {
+      return this.selectedInstanceId === "__all__";
+    },
+
+    currentInstance() {
+      if (this.isAllMode) return null;
+      return (
+        this.instancesStore.instances.find(
+          (i) => i.id === this.selectedInstanceId,
+        ) ?? null
+      );
+    },
+
+    /** Label shown next to the chart title */
+    chartLabel(): string | null {
+      if (this.isAllMode) return "All Instances";
+      return this.currentInstance?.name ?? null;
+    },
+
+    /**
+     * Summary shown in the stat cards.
+     * - Single instance: data straight from the store.
+     * - All instances: summed totals; unique_clients and domains_being_blocked
+     *   are derived from the union of top-N keys (see topClients / topBlocked
+     *   which are already merged across instances).
+     */
+    displaySummary(): PiholeSummary | null {
+      if (!this.isAllMode) {
+        return this.selectedInstanceId
+          ? (this.instancesStore.summaryData[this.selectedInstanceId] ?? null)
+          : null;
+      }
+
+      const instances = this.instancesStore.instances;
+      if (!instances.length) return null;
+
+      let totalQueries = 0;
+      let totalBlocked = 0;
+      let totalCached = 0;
+      let hasData = false;
+
+      instances.forEach((inst) => {
+        const s = this.instancesStore.summaryData[inst.id];
+        if (!s) return;
+        hasData = true;
+        totalQueries += Number(s.dns_queries_today) || 0;
+        totalBlocked += Number(s.ads_blocked_today) || 0;
+        totalCached  += Number(s.queries_cached)    || 0;
+      });
+
+      if (!hasData) return null;
+
+      const blockPct =
+        totalQueries > 0 ? (totalBlocked / totalQueries) * 100 : 0;
+
+      // Unique clients: count of distinct keys in the merged top-clients map.
+      // After mergeTopMaps() the union of IPs/names across all instances is
+      // already deduplicated, so key count = unique clients seen network-wide.
+      // Falls back to 0 while top data is still loading.
+      const uniqueClients = Object.keys(this.topClients).length;
+
+      // Domains in blocklist: summed across instances — deduplication is not
+      // possible because the API only returns a count, not the actual list.
+      // The label in StatsOverviewCards makes this transparent to the user.
+      let domainsBeingBlocked = 0;
+      instances.forEach((inst) => {
+        domainsBeingBlocked +=
+          Number(this.instancesStore.summaryData[inst.id]?.domains_being_blocked) || 0;
+      });
+
+      return {
+        status: "enabled",
+        dns_queries_today:    totalQueries,
+        ads_blocked_today:    totalBlocked,
+        ads_percentage_today: parseFloat(blockPct.toFixed(1)),
+        domains_being_blocked: domainsBeingBlocked,
+        unique_clients:       uniqueClients,
+        queries_cached:       totalCached,
+      };
+    },
+  },
+
+  watch: {
+    selectedInstanceId() {
+      void this.loadData();
+    },
+  },
+
+  mounted() {
+    this.instancesStore.loadFromStorage();
+    void this.instancesStore.refreshAll();
+    this.instancesStore.startPolling();
+
+    // Default: aggregate view when multiple instances, single instance otherwise
+    this.selectedInstanceId =
+      this.instancesStore.instances.length === 1
+        ? this.instancesStore.instances[0].id
+        : "__all__";
+
+    void this.loadData();
+  },
+
+  beforeUnmount() {
+    this.instancesStore.stopPolling();
+  },
+
+  methods: {
+    async loadData(): Promise<void> {
+      if (this.isAllMode) {
+        await this.loadAllInstancesData();
+      } else {
+        await this.loadSingleInstanceData();
+      }
+    },
+
+    // ── Single instance ──────────────────────────────────────────────────────
+
+    async loadSingleInstanceData(): Promise<void> {
+      await Promise.allSettled([
+        this.loadOverTime(),
+        this.loadTopData(),
+      ]);
+    },
+
+    async loadOverTime(): Promise<void> {
+      if (!this.currentInstance) return;
+      this.isLoadingCharts = true;
+      try {
+        this.overTimeData = await PiholeApiService.getOverTimeData(
+          this.currentInstance,
+        );
+      } catch (err) {
+        console.error("[StatisticsView] loadOverTime failed:", err);
+        this.overTimeData = null;
+      } finally {
+        this.isLoadingCharts = false;
+      }
+    },
+
+    async loadTopData(): Promise<void> {
+      if (!this.currentInstance) return;
+      this.isLoadingTop = true;
+      try {
+        const [topResult, clientsResult] = await Promise.allSettled([
+          PiholeApiService.getTopDomains(this.currentInstance, 10),
+          PiholeApiService.getTopClients(this.currentInstance, 10),
+        ]);
+
+        this.topDomains =
+          topResult.status === "fulfilled" ? topResult.value.topDomains : {};
+        this.topBlocked =
+          topResult.status === "fulfilled" ? topResult.value.topBlocked : {};
+        this.topClients =
+          clientsResult.status === "fulfilled" ? clientsResult.value : {};
+
+        if (topResult.status === "rejected")
+          console.error("[StatisticsView] topDomains failed:", topResult.reason);
+        if (clientsResult.status === "rejected")
+          console.error("[StatisticsView] topClients failed:", clientsResult.reason);
+      } finally {
+        this.isLoadingTop = false;
+      }
+    },
+
+    // ── All instances ────────────────────────────────────────────────────────
+
+    async loadAllInstancesData(): Promise<void> {
+      const instances = this.instancesStore.instances.filter(
+        (i) => i.status !== "offline",
+      );
+      if (!instances.length) return;
+
+      await Promise.allSettled([
+        this.loadAllOverTime(instances),
+        this.loadAllTopData(instances),
+      ]);
+    },
+
+    async loadAllOverTime(
+      instances: ReturnType<typeof useInstanceStore>["instances"],
+    ): Promise<void> {
+      this.isLoadingCharts = true;
+      try {
+        const results = await Promise.allSettled(
+          instances.map((inst) => PiholeApiService.getOverTimeData(inst)),
+        );
+        const datasets = results
+          .filter((r): r is PromiseFulfilledResult<OverTimeData> => r.status === "fulfilled")
+          .map((r) => r.value);
+
+        this.overTimeData = datasets.length ? mergeOverTimeData(datasets) : null;
+      } catch (err) {
+        console.error("[StatisticsView] loadAllOverTime failed:", err);
+        this.overTimeData = null;
+      } finally {
+        this.isLoadingCharts = false;
+      }
+    },
+
+    async loadAllTopData(
+      instances: ReturnType<typeof useInstanceStore>["instances"],
+    ): Promise<void> {
+      this.isLoadingTop = true;
+      try {
+        const [topResults, clientResults] = await Promise.all([
+          Promise.allSettled(
+            instances.map((inst) => PiholeApiService.getTopDomains(inst, 10)),
+          ),
+          Promise.allSettled(
+            instances.map((inst) => PiholeApiService.getTopClients(inst, 10)),
+          ),
+        ]);
+
+        const topMaps = topResults
+          .filter((r): r is PromiseFulfilledResult<{ topDomains: TopDomainsMap; topBlocked: TopDomainsMap }> => r.status === "fulfilled")
+          .map((r) => r.value);
+
+        // Merge and deduplicate — union of keys gives unique domains/clients
+        this.topDomains = mergeTopMaps(topMaps.map((t) => t.topDomains));
+        this.topBlocked = mergeTopMaps(topMaps.map((t) => t.topBlocked));
+
+        const clientMaps = clientResults
+          .filter((r): r is PromiseFulfilledResult<TopClientsMap> => r.status === "fulfilled")
+          .map((r) => r.value);
+
+        this.topClients = mergeTopMaps(clientMaps);
+      } finally {
+        this.isLoadingTop = false;
+      }
+    },
   },
 });
 </script>
@@ -372,6 +412,7 @@ export default defineComponent({
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }
+
 @media (max-width: 768px) {
   .two-col-grid {
     grid-template-columns: 1fr;

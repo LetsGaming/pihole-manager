@@ -16,7 +16,7 @@
           @select="selectInstance"
         />
 
-        <!-- List-type tab bar -->
+        <!-- List-type tabs -->
         <div class="list-type-tabs mb-3">
           <button
             v-for="tab in LIST_TABS"
@@ -26,13 +26,13 @@
             @click="switchTab(tab.key)"
           >
             {{ tab.label }}
-            <span v-if="counts[tab.key] != null" class="tab-count">{{
-              counts[tab.key]
-            }}</span>
+            <span v-if="counts[tab.key] != null" class="tab-count">
+              {{ counts[tab.key] }}
+            </span>
           </button>
         </div>
 
-        <!-- Adlists panel -->
+        <!-- ── Adlists panel ──────────────────────────────────────────────── -->
         <template v-if="activeTab === 'adlists'">
           <div class="card mb-3">
             <div class="card-header">
@@ -40,15 +40,15 @@
             </div>
             <div class="flex gap-2" style="flex-wrap: wrap">
               <input
-                class="field-input"
                 v-model="newAdlistUrl"
+                class="field-input"
                 style="flex: 1; min-width: 200px"
                 placeholder="https://hosts.example.com/adlist.txt"
                 @keyup.enter="addAdlist"
               />
               <input
-                class="field-input"
                 v-model="newAdlistComment"
+                class="field-input"
                 style="width: 200px"
                 placeholder="Comment (optional)"
               />
@@ -82,7 +82,9 @@
 
           <div class="card">
             <div class="card-header">
-              <span class="card-title">ADLISTS ({{ adlists.length }})</span>
+              <span class="card-title"
+                >ADLISTS ({{ sortedAdlists.length }})</span
+              >
               <div class="flex gap-2">
                 <button
                   class="btn btn-ghost btn-sm"
@@ -95,6 +97,36 @@
                 </button>
               </div>
             </div>
+
+            <!-- Active sort pills for adlists -->
+            <div v-if="adlistSortKey" class="sort-pills sort-pills--in-card">
+              <span class="text-xs text-muted" style="line-height: 24px"
+                >Sort:</span
+              >
+              <span
+                v-for="(level, idx) in adlistSort.levels"
+                :key="level.col"
+                class="sort-pill"
+              >
+                <span class="sort-pill-priority">{{ idx + 1 }}</span>
+                {{ ADLIST_LABELS[level.col] ?? level.col }}
+                {{ level.dir === "asc" ? "↑" : "↓" }}
+                <button
+                  class="sort-pill-remove"
+                  @click="onAdlistSortRemove(level.col)"
+                >
+                  ×
+                </button>
+              </span>
+              <button
+                class="btn btn-ghost btn-sm"
+                style="padding: 2px 8px; font-size: 11px"
+                @click="onAdlistSortClear"
+              >
+                Clear sort
+              </button>
+            </div>
+
             <div v-if="isLoading" class="p-3">
               <div
                 v-for="i in 4"
@@ -106,14 +138,32 @@
             <table v-else class="data-table">
               <thead>
                 <tr>
-                  <th>URL</th>
-                  <th>Comment</th>
-                  <th>Enabled</th>
+                  <SortableHeader
+                    col="address"
+                    label="URL"
+                    :sort="adlistSort"
+                    :sort-key="adlistSortKey"
+                    @sort-changed="onAdlistSortChanged"
+                  />
+                  <SortableHeader
+                    col="comment"
+                    label="Comment"
+                    :sort="adlistSort"
+                    :sort-key="adlistSortKey"
+                    @sort-changed="onAdlistSortChanged"
+                  />
+                  <SortableHeader
+                    col="enabled"
+                    label="Enabled"
+                    :sort="adlistSort"
+                    :sort-key="adlistSortKey"
+                    @sort-changed="onAdlistSortChanged"
+                  />
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="list in adlists" :key="list.id">
+                <tr v-for="list in sortedAdlists" :key="list.id">
                   <td class="mono" style="max-width: 300px">
                     <span class="truncate" :title="list.address">{{
                       list.address
@@ -126,8 +176,9 @@
                     <span
                       class="badge"
                       :class="list.enabled ? 'badge-green' : 'badge-gray'"
-                      >{{ list.enabled ? "On" : "Off" }}</span
                     >
+                      {{ list.enabled ? "On" : "Off" }}
+                    </span>
                   </td>
                   <td>
                     <div class="flex gap-2">
@@ -148,7 +199,7 @@
                     </div>
                   </td>
                 </tr>
-                <tr v-if="!adlists.length && !isLoading">
+                <tr v-if="!sortedAdlists.length && !isLoading">
                   <td
                     colspan="4"
                     style="
@@ -165,7 +216,7 @@
           </div>
         </template>
 
-        <!-- Domain lists panel -->
+        <!-- ── Domain list panels ─────────────────────────────────────────── -->
         <template v-else>
           <AddDomainForm
             :placeholder="domainPlaceholder"
@@ -175,7 +226,7 @@
           <DomainListTable
             :title="currentTabLabel"
             v-model:search-query="domainSearch"
-            :entries="domainList"
+            :entries="_domainList"
             :loading="isLoading"
             @refresh="loadDomainList"
             @remove="removeDomain"
@@ -188,7 +239,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, onMounted } from "vue";
+import { defineComponent, markRaw } from "vue";
 import { IonPage, IonContent, IonIcon } from "@ionic/vue";
 import {
   shieldOutline,
@@ -201,6 +252,7 @@ import {
 
 import PageHeader from "@/components/ui/PageHeader.vue";
 import EmptyState from "@/components/ui/EmptyState.vue";
+import SortableHeader from "@/components/ui/SortableHeader.vue";
 import InstanceTabBar from "@/components/blocklists/InstanceTabBar.vue";
 import AddDomainForm from "@/components/blocklists/AddDomainForm.vue";
 import DomainListTable from "@/components/blocklists/DomainListTable.vue";
@@ -208,6 +260,8 @@ import DomainListTable from "@/components/blocklists/DomainListTable.vue";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useClipboard } from "@/composables/useClipboard";
+import { useMultiSort } from "@/composables/useMultiSort";
+import type { MultiSort } from "@/composables/useMultiSort";
 import PiholeApiService from "@/services/piholeApi";
 import type { Adlist, DomainEntry, DomainListType } from "@/types/api";
 
@@ -235,6 +289,19 @@ const SUGGESTED_LISTS = [
   },
 ];
 
+const ADLIST_LABELS: Record<string, string> = {
+  address: "URL",
+  comment: "Comment",
+  enabled: "Enabled",
+};
+const ADLIST_ACCESSORS: Partial<
+  Record<string, (e: Adlist) => string | number>
+> = {
+  address: (e) => e.address,
+  comment: (e) => e.comment || "",
+  enabled: (e) => e.enabled,
+};
+
 export default defineComponent({
   name: "BlockListsView",
   components: {
@@ -243,190 +310,30 @@ export default defineComponent({
     IonIcon,
     PageHeader,
     EmptyState,
+    SortableHeader,
     InstanceTabBar,
     AddDomainForm,
     DomainListTable,
   },
 
-  setup() {
-    const instanceStore = useInstanceStore();
-    const notifications = useNotificationStore();
+  data() {
     const { copyToClipboard } = useClipboard();
-
-    const selectedInstanceId = ref<string | null>(null);
-    const activeTab = ref<string>("adlists");
-    const isLoading = ref(false);
-    const adlists = ref<Adlist[]>([]);
-    const domainList = ref<DomainEntry[]>([]);
-    const domainSearch = ref("");
-    const newAdlistUrl = ref("");
-    const newAdlistComment = ref("");
-    const counts = ref<Record<string, number>>({});
-
-    const currentInstance = computed(
-      () =>
-        instanceStore.instances.find(
-          (i) => i.id === selectedInstanceId.value,
-        ) ?? null,
-    );
-
-    const currentTabLabel = computed(
-      () => LIST_TABS.find((t) => t.key === activeTab.value)?.label ?? "",
-    );
-
-    const domainPlaceholder = computed(() =>
-      activeTab.value.includes("regex")
-        ? "e.g. .*\\.ads\\..*"
-        : "e.g. ads.example.com",
-    );
-
-    async function loadAdlists() {
-      if (!currentInstance.value) return;
-      isLoading.value = true;
-      try {
-        adlists.value = await PiholeApiService.getAdlists(
-          currentInstance.value,
-        );
-        counts.value.adlists = adlists.value.length;
-      } catch (err) {
-        notifications.error(
-          `Failed to load adlists: ${(err as Error).message}`,
-        );
-      } finally {
-        isLoading.value = false;
-      }
-    }
-
-    async function loadDomainList() {
-      if (!currentInstance.value) return;
-      isLoading.value = true;
-      try {
-        const raw = await PiholeApiService.getList(
-          currentInstance.value,
-          activeTab.value as DomainListType,
-        );
-        domainList.value = raw;
-        counts.value[activeTab.value] = raw.length;
-      } catch (err) {
-        notifications.error(`Failed to load list: ${(err as Error).message}`);
-      } finally {
-        isLoading.value = false;
-      }
-    }
-
-    function selectInstance(id: string) {
-      selectedInstanceId.value = id;
-      void loadAdlists();
-    }
-
-    function switchTab(key: string) {
-      activeTab.value = key;
-      domainSearch.value = "";
-      key === "adlists" ? void loadAdlists() : void loadDomainList();
-    }
-
-    async function addAdlist() {
-      if (!newAdlistUrl.value || !currentInstance.value) return;
-      try {
-        await PiholeApiService.addAdlist(
-          currentInstance.value,
-          newAdlistUrl.value,
-          newAdlistComment.value,
-        );
-        notifications.success(`Added adlist`);
-        newAdlistUrl.value = "";
-        newAdlistComment.value = "";
-        await loadAdlists();
-      } catch (err) {
-        notifications.error(`Failed: ${(err as Error).message}`);
-      }
-    }
-
-    async function removeAdlist(url: string) {
-      if (!currentInstance.value) return;
-      try {
-        await PiholeApiService.removeAdlist(currentInstance.value, url);
-        notifications.success("Adlist removed");
-        await loadAdlists();
-      } catch (err) {
-        notifications.error(`Failed: ${(err as Error).message}`);
-      }
-    }
-
-    async function addDomain(domain: string, comment: string) {
-      if (!currentInstance.value) return;
-      try {
-        await PiholeApiService.addToList(
-          currentInstance.value,
-          activeTab.value as DomainListType,
-          domain,
-          comment,
-        );
-        notifications.success(`Added to ${currentTabLabel.value}: ${domain}`);
-        await loadDomainList();
-      } catch (err) {
-        notifications.error(`Failed: ${(err as Error).message}`);
-      }
-    }
-
-    async function removeDomain(domain: string) {
-      if (!currentInstance.value) return;
-      try {
-        await PiholeApiService.removeFromList(
-          currentInstance.value,
-          activeTab.value as DomainListType,
-          domain,
-        );
-        notifications.success(`Removed: ${domain}`);
-        await loadDomainList();
-      } catch (err) {
-        notifications.error(`Failed: ${(err as Error).message}`);
-      }
-    }
-
-    async function triggerGravityUpdate() {
-      if (!currentInstance.value) return;
-      try {
-        await PiholeApiService.updateGravity(currentInstance.value);
-        notifications.info("Gravity update triggered (runs in background)");
-      } catch (err) {
-        notifications.error(`Failed: ${(err as Error).message}`);
-      }
-    }
-
-    onMounted(() => {
-      instanceStore.loadFromStorage();
-      selectedInstanceId.value =
-        instanceStore.activeInstanceId ??
-        instanceStore.instances[0]?.id ??
-        null;
-      if (selectedInstanceId.value) void loadAdlists();
-    });
-
     return {
-      instanceStore,
-      selectedInstanceId,
-      activeTab,
-      isLoading,
-      adlists,
-      domainList,
-      domainSearch,
-      newAdlistUrl,
-      newAdlistComment,
-      counts,
-      currentTabLabel,
-      domainPlaceholder,
+      selectedInstanceId: null as string | null,
+      activeTab: "adlists" as string,
+      isLoading: false as boolean,
+      _rawAdlists: markRaw([] as Adlist[]),
+      sortedAdlists: [] as Adlist[],
+      adlistSortKey: "" as string,
+      _domainList: markRaw([] as DomainEntry[]),
+      domainSearch: "" as string,
+      newAdlistUrl: "" as string,
+      newAdlistComment: "" as string,
+      counts: {} as Record<string, number>,
+      adlistSort: markRaw(useMultiSort()) as MultiSort,
+      ADLIST_LABELS,
       LIST_TABS,
       SUGGESTED_LISTS,
-      selectInstance,
-      switchTab,
-      loadAdlists,
-      loadDomainList,
-      addAdlist,
-      removeAdlist,
-      addDomain,
-      removeDomain,
-      triggerGravityUpdate,
       copyToClipboard,
       shieldOutline,
       addOutline,
@@ -435,6 +342,190 @@ export default defineComponent({
       copyOutline,
       trashOutline,
     };
+  },
+
+  computed: {
+    instanceStore() {
+      return useInstanceStore();
+    },
+
+    currentInstance() {
+      return (
+        this.instanceStore.instances.find(
+          (i) => i.id === this.selectedInstanceId,
+        ) ?? null
+      );
+    },
+
+    currentTabLabel(): string {
+      return LIST_TABS.find((t) => t.key === this.activeTab)?.label ?? "";
+    },
+
+    domainPlaceholder(): string {
+      return this.activeTab.includes("regex")
+        ? "e.g. .*\\.ads\\..*"
+        : "e.g. ads.example.com";
+    },
+  },
+
+  mounted() {
+    this.instanceStore.loadFromStorage();
+    this.selectedInstanceId =
+      this.instanceStore.activeInstanceId ??
+      this.instanceStore.instances[0]?.id ??
+      null;
+    if (this.selectedInstanceId) void this.loadAdlists();
+  },
+
+  methods: {
+    // ── Adlist sort ───────────────────────────────────────────────────────────
+    onAdlistSortChanged(): void {
+      this.adlistSortKey = this.adlistSort.levels
+        .map((l) => `${l.col}:${l.dir}`)
+        .join(",");
+      this._rebuildAdlists();
+    },
+
+    onAdlistSortRemove(col: string): void {
+      this.adlistSort.remove(col);
+      this.onAdlistSortChanged();
+    },
+
+    onAdlistSortClear(): void {
+      this.adlistSort.clear();
+      this.onAdlistSortChanged();
+    },
+
+    _rebuildAdlists(): void {
+      if (this.adlistSort.levels.length) {
+        this.sortedAdlists = this.adlistSort.apply(
+          this._rawAdlists as Adlist[],
+          ADLIST_ACCESSORS,
+        );
+      } else {
+        this.sortedAdlists = [...(this._rawAdlists as Adlist[])];
+      }
+    },
+
+    selectInstance(id: string): void {
+      this.selectedInstanceId = id;
+      void this.loadAdlists();
+    },
+
+    switchTab(key: string): void {
+      this.activeTab = key;
+      this.domainSearch = "";
+      key === "adlists" ? void this.loadAdlists() : void this.loadDomainList();
+    },
+
+    async loadAdlists(): Promise<void> {
+      if (!this.currentInstance) return;
+      this.isLoading = true;
+      try {
+        const fetched = await PiholeApiService.getAdlists(this.currentInstance);
+        this._rawAdlists = markRaw(fetched);
+        this.counts = { ...this.counts, adlists: fetched.length };
+        this._rebuildAdlists();
+      } catch (err) {
+        useNotificationStore().error(
+          `Failed to load adlists: ${(err as Error).message}`,
+        );
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async loadDomainList(): Promise<void> {
+      if (!this.currentInstance) return;
+      this.isLoading = true;
+      try {
+        const raw = await PiholeApiService.getList(
+          this.currentInstance,
+          this.activeTab as DomainListType,
+        );
+        this._domainList = markRaw(raw);
+        this.counts = { ...this.counts, [this.activeTab]: raw.length };
+      } catch (err) {
+        useNotificationStore().error(
+          `Failed to load list: ${(err as Error).message}`,
+        );
+      } finally {
+        this.isLoading = false;
+      }
+    },
+
+    async addAdlist(): Promise<void> {
+      if (!this.newAdlistUrl || !this.currentInstance) return;
+      try {
+        await PiholeApiService.addAdlist(
+          this.currentInstance,
+          this.newAdlistUrl,
+          this.newAdlistComment,
+        );
+        useNotificationStore().success("Adlist added");
+        this.newAdlistUrl = "";
+        this.newAdlistComment = "";
+        await this.loadAdlists();
+      } catch (err) {
+        useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      }
+    },
+
+    async removeAdlist(url: string): Promise<void> {
+      if (!this.currentInstance) return;
+      try {
+        await PiholeApiService.removeAdlist(this.currentInstance, url);
+        useNotificationStore().success("Adlist removed");
+        await this.loadAdlists();
+      } catch (err) {
+        useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      }
+    },
+
+    async addDomain(domain: string, comment: string): Promise<void> {
+      if (!this.currentInstance) return;
+      try {
+        await PiholeApiService.addToList(
+          this.currentInstance,
+          this.activeTab as DomainListType,
+          domain,
+          comment,
+        );
+        useNotificationStore().success(
+          `Added to ${this.currentTabLabel}: ${domain}`,
+        );
+        await this.loadDomainList();
+      } catch (err) {
+        useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      }
+    },
+
+    async removeDomain(domain: string): Promise<void> {
+      if (!this.currentInstance) return;
+      try {
+        await PiholeApiService.removeFromList(
+          this.currentInstance,
+          this.activeTab as DomainListType,
+          domain,
+        );
+        useNotificationStore().success(`Removed: ${domain}`);
+        await this.loadDomainList();
+      } catch (err) {
+        useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      }
+    },
+
+    async triggerGravityUpdate(): Promise<void> {
+      if (!this.currentInstance) return;
+      try {
+        await PiholeApiService.updateGravity(this.currentInstance);
+        useNotificationStore().info(
+          "Gravity update triggered (runs in background)",
+        );
+      } catch (err) {
+        useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      }
+    },
   },
 });
 </script>
@@ -474,7 +565,7 @@ export default defineComponent({
 }
 .tab-count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   background: var(--bg-hover);
   padding: 1px 5px;
   border-radius: 8px;

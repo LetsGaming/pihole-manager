@@ -1,120 +1,192 @@
 # Architecture
 
-## Project Structure
+## Overview
+
+Orbital is a Vue 3 + Ionic + Pinia single-page application for managing multiple Pi-hole instances from a unified dashboard.
 
 ```
 src/
-├── env.d.ts                    # Vue SFC + Vite env type declarations
-├── main.ts                     # App bootstrap
-├── App.vue                     # Root layout: split-pane sidebar + router outlet
-│
-├── types/                      # Shared TypeScript interfaces (single source of truth)
-│   ├── instance.ts             # PiholeInstance, ApiVersion, InstanceStatus
-│   ├── api.ts                  # PiholeSummary, QueryEntry, Adlist, DomainEntry, …
-│   ├── hardware.ts             # HardwareInfo, SeverityLevel
-│   └── index.ts                # Barrel re-export
-│
-├── services/
-│   ├── piholeApi.ts            # All Pi-hole API calls (v5 + v6), typed with generics
-│   └── hardwareService.ts      # Hardware data aggregation + formatters
-│
-├── stores/
-│   ├── instanceStore.ts        # Instance CRUD, polling, blocking, localStorage persistence
-│   └── notificationStore.ts   # Global toast queue
-│
-├── composables/
-│   ├── useFormatting.ts        # fmt, fmtPct, fmtTime, fmtDate, loadColor, barWidth
-│   ├── useClipboard.ts         # copyToClipboard with notification feedback
-│   ├── useLivePolling.ts       # setInterval lifecycle management
-│   ├── useBlockingControl.ts   # enable/disable blocking with notifications
-│   └── useAppSettings.ts      # Load/save app settings to localStorage
-│
+├── assets/
+│   └── global.css          # Design system: tokens, themes, utilities
 ├── components/
-│   ├── ToastContainer.vue      # Renders notification toasts
-│   ├── ui/                     # Generic, domain-agnostic components
-│   │   ├── EmptyState.vue      # Centered empty-state with icon/title/slot
-│   │   ├── PageHeader.vue      # Consistent ion-header toolbar
-│   │   ├── StatCard.vue        # Single metric card for stat grids
-│   │   ├── MetricGauge.vue     # Value + progress bar (CPU/RAM/Disk/Temp)
-│   │   └── TopDomainsBar.vue   # Horizontal bar row for top-N lists
 │   ├── dashboard/
-│   │   ├── InstanceCard.vue    # Per-instance overview card
-│   │   └── DisableBlockingModal.vue
-│   ├── querylog/
-│   │   ├── QueryLogToolbar.vue # Filters, instance selector, live/pause
-│   │   └── QueryLogRow.vue     # Single log entry row
-│   ├── hardware/
-│   │   └── HardwareCard.vue    # Full hardware info card for one instance
+│   │   ├── DisableBlockingModal.vue
+│   │   └── InstanceCard.vue
 │   ├── blocklists/
-│   │   ├── InstanceTabBar.vue  # Per-instance tab switcher
-│   │   ├── DomainListTable.vue # Table for black/white/regex lists
-│   │   └── AddDomainForm.vue   # Add domain input form
-│   └── settings/
-│       └── InstanceForm.vue    # Add/edit instance modal (with connection test)
-│
-├── views/                      # Thin routing shells — compose components
-│   ├── DashboardView.vue
-│   ├── QueryLogView.vue
-│   ├── BlockListsView.vue
-│   ├── StatisticsView.vue
-│   ├── HardwareView.vue
-│   ├── SettingsView.vue
-│   └── DocsView.vue
-│
+│   │   ├── AddDomainForm.vue
+│   │   ├── DomainListTable.vue
+│   │   └── InstanceTabBar.vue
+│   ├── hardware/
+│   │   └── HardwareCard.vue
+│   ├── querylog/
+│   │   ├── QueryLogRow.vue
+│   │   └── QueryLogToolbar.vue
+│   ├── settings/
+│   │   └── InstanceForm.vue
+│   ├── statistics/            ← extracted sub-components for Statistics view
+│   │   ├── StatsOverviewCards.vue   # 6 stat cards (queries, blocked, etc.)
+│   │   ├── StatsChart.vue           # Chart.js 24h over-time chart
+│   │   └── TopDomainsCard.vue       # Reusable top-N bar chart card
+│   ├── ui/
+│   │   ├── EmptyState.vue
+│   │   ├── MetricGauge.vue
+│   │   ├── PageHeader.vue
+│   │   ├── StatCard.vue       # Pi-hole-style stat card with left accent border + icon
+│   │   └── TopDomainsBar.vue  # Single domain/client bar row
+│   └── ToastContainer.vue
+├── composables/
+│   ├── useAppSettings.ts      # Poll intervals, log limits (persisted to localStorage)
+│   ├── useBlockingControl.ts  # enable/disable blocking with toast feedback
+│   ├── useClipboard.ts
+│   ├── useFormatting.ts       # fmt, fmtPct, barWidth, date helpers
+│   └── useLivePolling.ts
 ├── router/
-│   └── index.ts                # Routes + afterEach title hook
-│
-└── tests/
-    ├── setup.ts                # Ionic stubs, localStorage mock, clipboard mock
-    ├── unit/                   # Service and store unit tests
-    ├── components/             # Component rendering tests
-    └── integration/            # Multi-layer workflow tests
+│   └── index.ts
+├── services/
+│   ├── hardwareService.ts
+│   └── piholeApi.ts           # Pi-hole v5 + v6 API client
+├── stores/
+│   ├── instanceStore.ts       # Core store: CRUD, polling, status resilience
+│   └── notificationStore.ts
+├── tests/
+│   ├── components/            # Component-level tests (mount + stubs)
+│   ├── integration/           # Multi-instance + router tests
+│   ├── unit/                  # Store + service unit tests
+│   └── setup.ts
+├── types/
+│   ├── api.ts
+│   ├── hardware.ts
+│   ├── index.ts
+│   └── instance.ts
+└── views/
+    ├── BlockListsView.vue
+    ├── DashboardView.vue
+    ├── DocsView.vue
+    ├── HardwareView.vue
+    ├── QueryLogView.vue
+    ├── SettingsView.vue
+    └── StatisticsView.vue
 ```
 
-## Layer Responsibilities
+## Component API Style
 
-| Layer | Responsibility | Example |
-|---|---|---|
-| **Types** | Shape definitions only, no logic | `PiholeInstance`, `HardwareInfo` |
-| **Services** | API calls, data parsing, formatters | `piholeApi.ts`, `hardwareService.ts` |
-| **Stores** | Reactive state, persistence, cross-component data | `instanceStore.ts` |
-| **Composables** | Reusable logic that needs reactivity or lifecycle | `useLivePolling`, `useFormatting` |
-| **Components** | Isolated UI pieces with typed props/emits | `InstanceCard`, `MetricGauge` |
-| **Views** | Compose components, wire up store + composables | `DashboardView` |
+All Vue components use the **Options API** (`defineComponent` with `data()`, `computed`, `methods`, `watch`, lifecycle hooks). This makes component logic easy to read top-to-bottom, straightforward to debug with Vue DevTools, and consistent across the whole codebase.
 
-## Data Flow
+```ts
+export default defineComponent({
+  name: "MyComponent",
+  components: { ... },
+  props: { ... },
+  emits: [...],
+
+  data() { return { ... }; },
+  computed: { ... },
+  watch:    { ... },
+
+  mounted()       { ... },
+  beforeUnmount() { ... },
+
+  methods: { ... },
+});
+```
+
+Composables (`useFormatting`, `useBlockingControl`, etc.) are called inside `data()` or `methods()` — never in `setup()` — to keep the Options API boundary clear.
+
+## State Management — instanceStore
+
+`instanceStore` (Pinia) is the single source of truth for all Pi-hole instance data.
+
+### Reactive-update pattern
+
+All per-instance maps (`summaryData`, `loading`, `errors`, `_failCount`) are updated **immutably** using object spread so Vue's reactivity system always detects the change:
+
+```ts
+// ✅ Correct — triggers reactivity
+this.summaryData = { ...this.summaryData, [id]: newSummary };
+this.loading     = { ...this.loading,     [id]: false };
+
+// ❌ Wrong — Vue may miss the update
+this.summaryData[id] = newSummary;
+```
+
+The `instances` array is also replaced rather than mutated in-place (`_setStatus`, `updateInstance`, `addInstance`, `removeInstance`).
+
+### Status resilience
+
+An instance is only marked `"offline"` after `OFFLINE_THRESHOLD` (2) **consecutive** failed refreshes. A single transient error keeps the current status. Recovery resets the counter immediately.
 
 ```
-Pi-hole API ──► piholeApi.ts (typed) ──► instanceStore / views
-                                              │
-                                    composables (format, poll, clipboard)
-                                              │
-                                    components (props/emits)
-                                              │
-                                           views
+Fail 1  → keep current status, store error
+Fail 2  → mark offline
+Success → mark online, reset fail counter
 ```
 
-## State Management
+### Polling lifecycle
 
-**Pinia** with two stores:
+`startPolling()` / `stopPolling()` are called by the view that owns the polling lifecycle (typically `App.vue` or `DashboardView`). Guards prevent double-polling:
 
-### `instanceStore`
-- Source of truth for all Pi-hole instances
-- Persists to `localStorage` under key `orbital_instances`
-- Runs background polling via `startPolling(intervalMs)`
-- Exposes computed: `sortedInstances`, `onlineCount`, `globalBlockingStatus`, `activeSummary`
+```ts
+startPolling(): void {
+  if (this._pollHandle) return; // already running
+  this._pollHandle = setInterval(() => void this.refreshAll(), intervalMs);
+}
+```
 
-### `notificationStore`
-- Toast queue: `{ id, type, message }`
-- `show(type, msg, duration)` / `success()` / `error()` / `warning()` / `info()`
-- Auto-dismiss via `setTimeout`
+## Design System & Theming
 
-## Adding a New Feature
+### CSS custom properties
 
-1. Add types to `src/types/`
-2. Add API method to `src/services/piholeApi.ts`
-3. Add store action if state is needed across components
-4. Extract reusable logic to a composable if it's used in 2+ places
-5. Build the smallest possible component that does one thing
-6. Compose in the view
-7. Add tests at every layer
+All colours, radii and shadows are CSS custom properties defined in `global.css`. Two themes are supported:
+
+| Attribute | Theme |
+|---|---|
+| `[data-theme="dark"]` (default) | Dark mission-control |
+| `[data-theme="light"]` | Light / accessibility-friendly |
+
+The theme is toggled by setting `data-theme` on `<html>` and persisted to `localStorage` under the key `orbital_theme`.
+
+### StatCard
+
+`StatCard` renders a Pi-hole-style stat card with:
+- A **4 px left accent border** coloured by the `accent` prop (`red`, `cyan`, `green`, `amber`, `purple`)
+- An optional **icon** (Ionicons) in a tinted icon box
+- A large monospaced **number** and a small **label** above it
+- An optional **sub-label** below the number
+
+```html
+<StatCard
+  label="Blocked Today"
+  value="1,234"
+  accent="red"
+  :icon="shieldOutline"
+  sub="last 24 h"
+/>
+```
+
+### Statistics view components
+
+The `StatisticsView` is decomposed into three reusable sub-components:
+
+| Component | Responsibility |
+|---|---|
+| `StatsOverviewCards` | 6 stat cards (queries, blocked, rate, domains, clients, cached) |
+| `StatsChart` | Chart.js 24 h line chart — owns the Chart instance lifecycle |
+| `TopDomainsCard` | Generic top-N bar-chart card (queried / blocked / clients) |
+
+The view itself only handles: instance selection, data fetching, aggregate computation, and routing between "all instances" and single-instance layouts.
+
+## Statistics View — All Instances mode
+
+When `selectedInstanceId === "__all__"` the view shows:
+1. An **aggregate `StatsOverviewCards`** (sums across all instances)
+2. A **per-instance mini grid** showing per-instance query / blocked / rate figures
+
+Switching to a specific instance shows the full single-instance layout (chart + top domain cards).
+
+## Accessibility
+
+- `[data-theme="light"]` provides WCAG-AA compliant colour contrast on white backgrounds
+- All interactive elements have `aria-label` or visible text labels
+- `focus-visible` outlines are applied globally for keyboard navigation
+- `@media (prefers-reduced-motion)` disables all animations
+- `.sr-only` utility class for visually-hidden but screen-reader-accessible content

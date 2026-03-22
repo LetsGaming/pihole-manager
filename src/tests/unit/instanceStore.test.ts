@@ -1,5 +1,8 @@
 /**
  * Unit Tests — instanceStore
+ *
+ * Covers: CRUD, status resilience, blocking control, getters, persistence, polling.
+ * Uses immutable reactive-update pattern introduced in the refactored store.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -10,10 +13,10 @@ import type { PiholeSummary } from "@/types/api";
 
 vi.mock("@/services/piholeApi", () => ({
   default: {
-    getSummary: vi.fn(),
-    enableBlocking: vi.fn(),
-    disableBlocking: vi.fn(),
-    testConnection: vi.fn(),
+    getSummary:       vi.fn(),
+    enableBlocking:   vi.fn(),
+    disableBlocking:  vi.fn(),
+    testConnection:   vi.fn(),
     errorMessage: (err: unknown) => (err as Error)?.message ?? "Unknown error",
   },
 }));
@@ -42,19 +45,16 @@ function cfg(overrides: Partial<NewInstanceConfig> = {}): NewInstanceConfig {
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.mocked(PiholeApiService.getSummary).mockResolvedValue(VALID_SUMMARY);
-  vi.mocked(PiholeApiService.enableBlocking).mockResolvedValue({
-    status: "enabled",
-  });
-  vi.mocked(PiholeApiService.disableBlocking).mockResolvedValue({
-    status: "disabled",
-  });
+  vi.mocked(PiholeApiService.enableBlocking).mockResolvedValue({ status: "enabled" });
+  vi.mocked(PiholeApiService.disableBlocking).mockResolvedValue({ status: "disabled" });
   vi.useFakeTimers();
 });
+
 afterEach(() => {
   vi.useRealTimers();
 });
 
-// ─── addInstance ──────────────────────────────────────────────────────────────
+// ── addInstance ───────────────────────────────────────────────────────────────
 describe("instanceStore.addInstance", () => {
   it("adds an instance with generated id", () => {
     const store = useInstanceStore();
@@ -96,9 +96,23 @@ describe("instanceStore.addInstance", () => {
     const saved = JSON.parse(localStorage.getItem("orbital_instances") ?? "{}");
     expect(saved.instances).toHaveLength(1);
   });
+
+  it("initialises loading[id] = false", () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    expect(store.loading[id]).toBe(false);
+  });
+
+  it("initialises errors[id] = null", () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    expect(store.errors[id]).toBeNull();
+  });
 });
 
-// ─── updateInstance ───────────────────────────────────────────────────────────
+// ── updateInstance ────────────────────────────────────────────────────────────
 describe("instanceStore.updateInstance", () => {
   it("updates allowed fields", () => {
     const store = useInstanceStore();
@@ -109,13 +123,21 @@ describe("instanceStore.updateInstance", () => {
     expect(store.instances[0].apiToken).toBe("new-token");
   });
 
+  it("resets fail counter after update", () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    store.updateInstance(id, { name: "New" });
+    expect(store._failCount[id]).toBe(0);
+  });
+
   it("throws when instance not found", () => {
     const store = useInstanceStore();
     expect(() => store.updateInstance("nonexistent", { name: "x" })).toThrow();
   });
 });
 
-// ─── removeInstance ───────────────────────────────────────────────────────────
+// ── removeInstance ────────────────────────────────────────────────────────────
 describe("instanceStore.removeInstance", () => {
   it("removes the instance", () => {
     const store = useInstanceStore();
@@ -131,6 +153,16 @@ describe("instanceStore.removeInstance", () => {
     await store.refreshInstance(id);
     store.removeInstance(id);
     expect(store.summaryData[id]).toBeUndefined();
+  });
+
+  it("clears loading/errors/failCount for removed instance", async () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    store.removeInstance(id);
+    expect(store.loading[id]).toBeUndefined();
+    expect(store.errors[id]).toBeUndefined();
+    expect(store._failCount[id]).toBeUndefined();
   });
 
   it("promotes next instance as active when active is removed", () => {
@@ -149,7 +181,7 @@ describe("instanceStore.removeInstance", () => {
   });
 });
 
-// ─── setActiveInstance ────────────────────────────────────────────────────────
+// ── setActiveInstance ─────────────────────────────────────────────────────────
 describe("instanceStore.setActiveInstance", () => {
   it("sets the active instance", () => {
     const store = useInstanceStore();
@@ -169,7 +201,7 @@ describe("instanceStore.setActiveInstance", () => {
   });
 });
 
-// ─── refreshInstance ──────────────────────────────────────────────────────────
+// ── refreshInstance ───────────────────────────────────────────────────────────
 describe("instanceStore.refreshInstance", () => {
   it("sets status to online on success", async () => {
     const store = useInstanceStore();
@@ -186,57 +218,68 @@ describe("instanceStore.refreshInstance", () => {
     expect(store.summaryData[id].dns_queries_today).toBe(500);
   });
 
-  it("keeps status as-is on first failure (resilience)", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
-      new Error("refused"),
-    );
+  it("updates summaryData reactively (new object reference)", async () => {
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
-    // First failure: status stays unknown (below OFFLINE_THRESHOLD=2)
+    const before = store.summaryData;
     await store.refreshInstance(id);
+    // After refresh, summaryData should be a new object (immutable update)
+    expect(store.summaryData).not.toBe(before);
+    expect(store.summaryData[id]).toBeDefined();
+  });
+
+  it("keeps status as-is on first failure (resilience)", async () => {
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    await store.refreshInstance(id);
+    // One failure — below OFFLINE_THRESHOLD=2 — status stays unknown
     expect(store.instances[0].status).not.toBe("offline");
     expect(store.errors[id]).toBeTruthy();
   });
 
   it("sets status to offline after OFFLINE_THRESHOLD consecutive failures", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
-      new Error("refused"),
-    );
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
-    // Fail twice to hit the threshold
     await store.refreshInstance(id);
-    await store.refreshInstance(id);
+    await store.refreshInstance(id); // second failure — hits threshold
     expect(store.instances[0].status).toBe("offline");
   });
 
   it("resets fail counter and goes back online after recovery", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
-      new Error("refused"),
-    );
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
     await store.refreshInstance(id);
-    await store.refreshInstance(id); // now offline
+    await store.refreshInstance(id); // offline
     expect(store.instances[0].status).toBe("offline");
-    // Recover
+
     vi.mocked(PiholeApiService.getSummary).mockResolvedValue(VALID_SUMMARY);
     await store.refreshInstance(id);
     expect(store.instances[0].status).toBe("online");
+    expect(store._failCount[id]).toBe(0);
   });
 
   it("stores error message on failure", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
-      new Error("Timeout"),
-    );
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("Timeout"));
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
     await store.refreshInstance(id);
     expect(store.errors[id]).toBeTruthy();
+  });
+
+  it("clears loading flag after completion", async () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    const id = store.instances[0].id;
+    await store.refreshInstance(id);
+    expect(store.loading[id]).toBe(false);
   });
 
   it("is a no-op for unknown id", async () => {
@@ -245,7 +288,7 @@ describe("instanceStore.refreshInstance", () => {
   });
 });
 
-// ─── Blocking control ─────────────────────────────────────────────────────────
+// ── Blocking control ──────────────────────────────────────────────────────────
 describe("instanceStore.enableBlocking", () => {
   it("calls API and refreshes", async () => {
     const store = useInstanceStore();
@@ -257,9 +300,7 @@ describe("instanceStore.enableBlocking", () => {
 
   it("throws for unknown instance", async () => {
     const store = useInstanceStore();
-    await expect(store.enableBlocking("bad-id")).rejects.toThrow(
-      "Instance not found",
-    );
+    await expect(store.enableBlocking("bad-id")).rejects.toThrow("Instance not found");
   });
 });
 
@@ -288,19 +329,20 @@ describe("instanceStore.enableAllBlocking", () => {
   });
 });
 
-// ─── Getters ──────────────────────────────────────────────────────────────────
+// ── Getters ───────────────────────────────────────────────────────────────────
 describe("instanceStore getters", () => {
   it("onlineCount and offlineCount", async () => {
     const store = useInstanceStore();
     store.addInstance(cfg({ name: "Online" }));
     store.addInstance(cfg({ name: "Offline" }));
-    // Need OFFLINE_THRESHOLD (2) failures to mark offline
-    vi.mocked(PiholeApiService.getSummary).mockResolvedValue(VALID_SUMMARY); // default: all succeed
+
+    // Need 2 failures to hit threshold for second instance
     vi.mocked(PiholeApiService.getSummary)
-      .mockResolvedValueOnce(VALID_SUMMARY) // Online: refresh 1 ok
-      .mockRejectedValueOnce(new Error("down")) // Offline: refresh 1 fail
-      .mockResolvedValueOnce(VALID_SUMMARY) // Online: refresh 2 ok
-      .mockRejectedValueOnce(new Error("down")); // Offline: refresh 2 fail (hits threshold)
+      .mockResolvedValueOnce(VALID_SUMMARY)   // Online: pass
+      .mockRejectedValueOnce(new Error("down")) // Offline: fail 1
+      .mockResolvedValueOnce(VALID_SUMMARY)   // Online: pass
+      .mockRejectedValueOnce(new Error("down")); // Offline: fail 2 → offline
+
     await store.refreshAll();
     await store.refreshAll();
     expect(store.onlineCount).toBe(1);
@@ -315,6 +357,7 @@ describe("instanceStore getters", () => {
       .mockRejectedValueOnce(new Error("down"))
       .mockResolvedValueOnce(VALID_SUMMARY);
     await store.refreshAll();
+    // First instance still "unknown" (1 failure < threshold), Online is "online"
     expect(store.sortedInstances[0].status).toBe("online");
   });
 
@@ -322,6 +365,11 @@ describe("instanceStore getters", () => {
     const store = useInstanceStore();
     store.addInstance(cfg({ name: "Alpha" }));
     expect(store.activeInstance?.name).toBe("Alpha");
+  });
+
+  it("activeSummary returns null with no active instance", () => {
+    const store = useInstanceStore();
+    expect(store.activeSummary).toBeNull();
   });
 
   it("globalBlockingStatus is enabled when all online are enabled", async () => {
@@ -341,9 +389,16 @@ describe("instanceStore getters", () => {
     await store.refreshAll();
     expect(store.globalBlockingStatus).toBe("mixed");
   });
+
+  it("globalBlockingStatus is unknown when no instances are online", () => {
+    const store = useInstanceStore();
+    store.addInstance(cfg());
+    // No refresh — status stays "unknown" (not "online")
+    expect(store.globalBlockingStatus).toBe("unknown");
+  });
 });
 
-// ─── Persistence ──────────────────────────────────────────────────────────────
+// ── Persistence ───────────────────────────────────────────────────────────────
 describe("instanceStore persistence", () => {
   it("loadFromStorage restores instances", () => {
     localStorage.setItem(
@@ -370,6 +425,34 @@ describe("instanceStore persistence", () => {
     expect(store.activeInstanceId).toBe("ph_abc");
   });
 
+  it("initialises transient state for restored instances", () => {
+    localStorage.setItem(
+      "orbital_instances",
+      JSON.stringify({
+        instances: [{ id: "ph_abc", name: "R", url: "http://pi.hole", apiToken: "t", apiVersion: "v5", status: "unknown", addedAt: "" }],
+        activeInstanceId: "ph_abc",
+      }),
+    );
+    const store = useInstanceStore();
+    store.loadFromStorage();
+    expect(store.loading["ph_abc"]).toBe(false);
+    expect(store.errors["ph_abc"]).toBeNull();
+    expect(store._failCount["ph_abc"]).toBe(0);
+  });
+
+  it("falls back to first instance if saved activeId is gone", () => {
+    localStorage.setItem(
+      "orbital_instances",
+      JSON.stringify({
+        instances: [{ id: "ph_xyz", name: "Only", url: "http://pi.hole", apiToken: "t", apiVersion: "v5", status: "unknown", addedAt: "" }],
+        activeInstanceId: "ph_gone",
+      }),
+    );
+    const store = useInstanceStore();
+    store.loadFromStorage();
+    expect(store.activeInstanceId).toBe("ph_xyz");
+  });
+
   it("handles corrupted localStorage gracefully", () => {
     localStorage.setItem("orbital_instances", "not-valid-json{{{");
     const store = useInstanceStore();
@@ -378,7 +461,7 @@ describe("instanceStore persistence", () => {
   });
 });
 
-// ─── Polling ──────────────────────────────────────────────────────────────────
+// ── Polling ───────────────────────────────────────────────────────────────────
 describe("instanceStore polling", () => {
   it("startPolling calls refreshAll on interval", async () => {
     const store = useInstanceStore();
@@ -388,9 +471,7 @@ describe("instanceStore polling", () => {
     store.startPolling(1000);
     vi.advanceTimersByTime(2500);
     await Promise.resolve();
-    expect(
-      vi.mocked(PiholeApiService.getSummary).mock.calls.length,
-    ).toBeGreaterThanOrEqual(1);
+    expect(vi.mocked(PiholeApiService.getSummary).mock.calls.length).toBeGreaterThanOrEqual(1);
     store.stopPolling();
   });
 

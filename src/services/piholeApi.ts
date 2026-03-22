@@ -1,14 +1,3 @@
-/**
- * Pi-hole API Service
- *
- * Full v5 + v6 support with branched implementations per method.
- *
- * v5: /admin/api.php?param=value  + ?auth=TOKEN
- * v6: /api/<resource>             + session token via POST /api/auth
- *
- * v6 session tokens are cached per-instance (in memory) and refreshed on 401.
- */
-
 import axios, { type AxiosInstance } from "axios";
 import type { PiholeInstance } from "@/types/instance";
 import type {
@@ -49,18 +38,8 @@ const STATUS_MAP: Record<number, QueryStatus> = {
 };
 
 // ─── v6 Session cache ─────────────────────────────────────────────────────────
-//
-// Sessions are persisted to sessionStorage so they survive tab navigation,
-// React-style hot-reloads, and settings changes — without forcing a new
-// /api/auth call every page load.
-//
-// sessionStorage is cleared when the browser tab/window is closed, so
-// sessions don't accumulate across browser restarts.
-//
-// Pi-hole v6 sessions expire after 5 hours (300 minutes) by default.
-// We treat a session as expired after SESSION_TTL_MS to re-auth proactively.
 
-const SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours (conservative)
+const SESSION_TTL_MS = 4 * 60 * 60 * 1000; // 4 hours
 const SESSION_KEY_PFX = "orbital_v6sid_";
 
 interface CachedSession {
@@ -83,12 +62,12 @@ function loadSession(instanceId: string): string | null {
   }
 }
 
-function saveSession(instanceId: string, sid: string): void {
+function saveSession(instanceId: string, sid: string, ttlMs: number): void {
   try {
-    const entry: CachedSession = { sid, expires: Date.now() + SESSION_TTL_MS };
+    const entry: CachedSession = { sid, expires: Date.now() + ttlMs };
     sessionStorage.setItem(SESSION_KEY_PFX + instanceId, JSON.stringify(entry));
   } catch {
-    // sessionStorage not available (e.g. private browsing with storage blocked)
+    // ignore
   }
 }
 
@@ -102,14 +81,6 @@ function dropSession(instanceId: string): void {
 
 // ─── Dev proxy helpers ────────────────────────────────────────────────────────
 
-/**
- * In development (import.meta.env.DEV), route all Pi-hole traffic through
- * the Vite dev proxy to avoid CORS issues. The proxy pattern is:
- *   /pihole-proxy/<base64url(instanceUrl)>/<api-path>
- *
- * In production the app is served from the same origin as Pi-hole (or behind
- * a reverse proxy), so requests go directly to the instance URL.
- */
 function baseURL(instanceUrl: string): string {
   if (import.meta.env.DEV) {
     const b64 = btoa(instanceUrl.replace(/\/$/, ""))
@@ -123,7 +94,6 @@ function baseURL(instanceUrl: string): string {
 
 // ─── HTTP client factories ────────────────────────────────────────────────────
 
-/** v5: /admin/api.php with ?auth= injected by interceptor */
 function v5Client(instance: PiholeInstance): AxiosInstance {
   const client = axios.create({
     baseURL: baseURL(instance.url),
@@ -136,7 +106,6 @@ function v5Client(instance: PiholeInstance): AxiosInstance {
   return client;
 }
 
-/** v6: /api with X-FTL-SID header injected by interceptor */
 function v6Client(instance: PiholeInstance): AxiosInstance {
   const client = axios.create({
     baseURL: baseURL(instance.url),
@@ -150,12 +119,6 @@ function v6Client(instance: PiholeInstance): AxiosInstance {
   return client;
 }
 
-/**
- * Ensures a valid v6 session exists for `instance`.
- * Checks sessionStorage first — only calls POST /api/auth when:
- *   - No session exists yet, or
- *   - The stored session has expired (> 4h old)
- */
 async function ensureV6Session(instance: PiholeInstance): Promise<string> {
   const existing = loadSession(instance.id);
   if (existing) return existing;
@@ -171,27 +134,15 @@ async function ensureV6Session(instance: PiholeInstance): Promise<string> {
   const sid = data?.session?.sid;
   if (!sid) throw new Error("v6 auth failed — check your Pi-hole web password");
 
-  // If Pi-hole tells us the actual validity (seconds), use that instead of our default
   const serverTtlMs = data.session?.validity
     ? data.session.validity * 1000
     : SESSION_TTL_MS;
-  // Store with a 5-minute safety margin before server expiry
   const ttl = Math.max(serverTtlMs - 5 * 60 * 1000, 60_000);
-  try {
-    sessionStorage.setItem(
-      SESSION_KEY_PFX + instance.id,
-      JSON.stringify({
-        sid,
-        expires: Date.now() + ttl,
-      } satisfies CachedSession),
-    );
-  } catch {
-    // sessionStorage unavailable — session lives only for this call
-  }
+
+  saveSession(instance.id, sid, ttl);
   return sid;
 }
 
-/** Clears a v6 session — forces re-auth on next request */
 function clearV6Session(instanceId: string): void {
   dropSession(instanceId);
 }
@@ -217,7 +168,6 @@ export function errorMessage(err: unknown): string {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Run a v6 API call, retrying once after re-authing on 401. */
 async function v6Call<T>(
   instance: PiholeInstance,
   fn: (client: AxiosInstance) => Promise<T>,
@@ -237,11 +187,9 @@ async function v6Call<T>(
   }
 }
 
-/** Map v6 query status string (or legacy numeric) to QueryStatus */
 function v6QueryStatus(status: string | number): QueryStatus {
   if (typeof status === "string") {
     const s = status.toUpperCase();
-    // Blocked categories
     if (
       s.includes("GRAVITY") ||
       s.includes("REGEX") ||
@@ -250,7 +198,6 @@ function v6QueryStatus(status: string | number): QueryStatus {
       s === "SPECIAL_DOMAIN"
     )
       return "blocked";
-    // Cached categories
     if (
       s === "CACHE" ||
       s === "CACHE_STALE" ||
@@ -258,13 +205,10 @@ function v6QueryStatus(status: string | number): QueryStatus {
       s === "RETRIED_DNSSEC"
     )
       return "cached";
-    // Unknown / in-flight
     if (s === "IN_PROGRESS" || s === "DBBUSY" || s === "UNKNOWN")
       return "unknown";
-    // Forwarded and everything else = allowed
     return "allowed";
   }
-  // v5-compat numeric fallback
   if ([1, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15].includes(status as number))
     return "blocked";
   if ([3, 16].includes(status as number)) return "cached";
@@ -275,19 +219,15 @@ function v6QueryStatus(status: string | number): QueryStatus {
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 const PiholeApiService = {
-  // ─── Summary ───────────────────────────────────────────────────────────────
-
   async getSummary(instance: PiholeInstance): Promise<PiholeSummary> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        // Fetch summary and blocking status in parallel
         const [summaryRes, blockingRes] = await Promise.all([
           client.get<{
             queries: {
               total: number;
               blocked: number;
               percent_blocked: number;
-              unique_domains?: number;
               forwarded?: number;
               cached?: number;
             };
@@ -301,7 +241,7 @@ const PiholeApiService = {
         const d = summaryRes.data;
         return {
           status:
-            d.gravity !== undefined // gravity only absent on error
+            d.gravity !== undefined
               ? blockingRes.data.blocking
                 ? "enabled"
                 : "disabled"
@@ -313,7 +253,6 @@ const PiholeApiService = {
           unique_clients: d.clients.active,
           queries_cached: d.queries.cached,
           queries_forwarded: d.queries.forwarded,
-          // Normalize gravity_last_updated to match v5 shape
           ...(d.gravity.last_update != null && {
             gravity_last_updated: {
               absolute: d.gravity.last_update,
@@ -325,9 +264,7 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<PiholeSummary>(
       "/admin/api.php",
-      {
-        params: { summary: "" },
-      },
+      { params: { summary: "" } },
     );
     return data;
   },
@@ -345,14 +282,10 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
       "/admin/api.php",
-      {
-        params: { status: "" },
-      },
+      { params: { status: "" } },
     );
     return data;
   },
-
-  // ─── Blocking Control ──────────────────────────────────────────────────────
 
   async enableBlocking(
     instance: PiholeInstance,
@@ -365,12 +298,8 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
       "/admin/api.php",
-      {
-        params: { enable: "" },
-      },
+      { params: { enable: "" } },
     );
-    if (data.status !== "enabled")
-      throw new Error(`Unexpected status: ${data.status}`);
     return data;
   },
 
@@ -388,16 +317,10 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
       "/admin/api.php",
-      {
-        params: { disable: seconds },
-      },
+      { params: { disable: seconds } },
     );
-    if (data.status !== "disabled")
-      throw new Error(`Unexpected status: ${data.status}`);
     return data;
   },
-
-  // ─── Query Log ─────────────────────────────────────────────────────────────
 
   async getQueryLog(
     instance: PiholeInstance,
@@ -407,22 +330,13 @@ const PiholeApiService = {
       return v6Call(instance, async (client) => {
         const { data } = await client.get<{
           queries?: Array<{
-            id: number;
-            time: number; // Unix timestamp (float, seconds)
-            type: string; // "A", "AAAA", "HTTPS", "PTR"…
+            time: number;
+            type: string;
             domain: string;
-            status: string; // "GRAVITY", "FORWARDED", "CACHE", "CACHE_STALE"…
-            client: { ip: string; name?: string | null };
-            reply?: { type?: string; time?: number };
-            upstream?: string | null;
+            status: string;
+            client: { ip: string };
           }>;
-          cursor?: number;
-          recordsTotal?: number;
-          recordsFiltered?: number;
-        }>("/api/queries", {
-          params: { length: count },
-        });
-
+        }>("/api/queries", { params: { length: count } });
         return (data.queries ?? []).map((q) => ({
           timestamp: Math.round(q.time * 1000),
           type: q.type,
@@ -436,9 +350,7 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ data?: unknown[][] }>(
       "/admin/api.php",
-      {
-        params: { getAllQueries: count },
-      },
+      { params: { getAllQueries: count } },
     );
     return (data.data ?? []).map(PiholeApiService._parseQueryEntry);
   },
@@ -455,32 +367,55 @@ const PiholeApiService = {
     };
   },
 
-  // ─── Top Domains / Clients ─────────────────────────────────────────────────
-
   async getTopDomains(
     instance: PiholeInstance,
     count = 10,
   ): Promise<TopDomainsResult> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        const { data } = await client.get<{
-          top_domains?: Array<{ domain: string; count: number }>;
-          top_blocked?: Array<{ domain: string; count: number }>;
-        }>("/api/stats/top_domains", { params: { count } });
-        const toMap = (
-          arr: Array<{ domain: string; count: number }> = [],
-        ): TopDomainsMap =>
-          Object.fromEntries(arr.map((e) => [e.domain, e.count]));
+        // Fetch allowed domains and blocked domains separately or via combined params if supported
+        const [allowedRes, blockedRes] = await Promise.all([
+          client.get<{ domains?: any }>("/api/stats/top_domains", {
+            params: { count, blocked: false },
+          }),
+          client.get<{ domains?: any }>("/api/stats/top_domains", {
+            params: { count, blocked: true },
+          }),
+        ]);
+
+        const toMap = (arr: any): TopDomainsMap => {
+          const map: TopDomainsMap = {};
+          if (!arr) return map;
+
+          if (Array.isArray(arr)) {
+            for (const item of arr) {
+              if (item?.domain) {
+                map[item.domain] = item.count;
+              }
+            }
+            return map;
+          }
+
+          if (typeof arr === "object") {
+            return arr as TopDomainsMap;
+          }
+
+          return map;
+        };
+
         return {
-          topDomains: toMap(data.top_domains),
-          topBlocked: toMap(data.top_blocked),
+          topDomains: toMap(allowedRes.data.domains),
+          topBlocked: toMap(blockedRes.data.domains),
         };
       });
     }
+
+    // v5 Legacy API Fallback
     const { data } = await v5Client(instance).get<{
       top_queries?: TopDomainsMap;
       top_ads?: TopDomainsMap;
     }>("/admin/api.php", { params: { topItems: count } });
+
     return {
       topDomains: data.top_queries ?? {},
       topBlocked: data.top_ads ?? {},
@@ -494,10 +429,10 @@ const PiholeApiService = {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
         const { data } = await client.get<{
-          top_clients?: Array<{ ip: string; name?: string; count: number }>;
+          clients?: Array<{ ip: string; name?: string; count: number }>;
         }>("/api/stats/top_clients", { params: { count } });
         return Object.fromEntries(
-          (data.top_clients ?? []).map((c) => [c.name ?? c.ip, c.count]),
+          (data.clients ?? []).map((c) => [c.name || c.ip, c.count]),
         );
       });
     }
@@ -506,8 +441,6 @@ const PiholeApiService = {
     }>("/admin/api.php", { params: { getQuerySources: count } });
     return data.top_sources ?? {};
   },
-
-  // ─── Over-time ─────────────────────────────────────────────────────────────
 
   async getOverTimeData(instance: PiholeInstance): Promise<OverTimeData> {
     if (instance.apiVersion === "v6") {
@@ -538,8 +471,6 @@ const PiholeApiService = {
     };
   },
 
-  // ─── Adlists ───────────────────────────────────────────────────────────────
-
   async getAdlists(instance: PiholeInstance): Promise<Adlist[]> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
@@ -563,9 +494,7 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ data?: Adlist[] }>(
       "/admin/api.php",
-      {
-        params: { list: "adlist" },
-      },
+      { params: { list: "adlist" } },
     );
     return data.data ?? [];
   },
@@ -598,7 +527,6 @@ const PiholeApiService = {
   async removeAdlist(instance: PiholeInstance, url: string): Promise<void> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        // v6: DELETE /api/lists/{id} — but we only have the URL, so find by listing first
         const { data: list } = await client.get<{
           lists?: Array<{ id: number; address: string }>;
         }>("/api/lists", { params: { type: "block" } });
@@ -615,9 +543,6 @@ const PiholeApiService = {
       throw new Error(data.message ?? "Failed to remove adlist");
   },
 
-  // ─── Domain lists ──────────────────────────────────────────────────────────
-
-  /** Map v5 list type to v6 list type + kind */
   _v6ListType(listType: DomainListType): { type: string; kind: string } {
     switch (listType) {
       case "black":
@@ -656,9 +581,7 @@ const PiholeApiService = {
     }
     const { data } = await v5Client(instance).get<{ data?: DomainEntry[] }>(
       "/admin/api.php",
-      {
-        params: { list: listType },
-      },
+      { params: { list: listType } },
     );
     return data.data ?? [];
   },
@@ -698,7 +621,6 @@ const PiholeApiService = {
     if (instance.apiVersion === "v6") {
       const { type, kind } = PiholeApiService._v6ListType(listType);
       return v6Call(instance, async (client) => {
-        // v6: DELETE /api/domains/{type}/{kind}/{domain}
         await client.delete(
           `/api/domains/${type}/${kind}/${encodeURIComponent(domain)}`,
         );
@@ -712,8 +634,6 @@ const PiholeApiService = {
       throw new Error(data.message ?? "Failed to remove domain");
   },
 
-  // ─── Gravity ───────────────────────────────────────────────────────────────
-
   async updateGravity(instance: PiholeInstance): Promise<void> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
@@ -724,8 +644,6 @@ const PiholeApiService = {
       params: { updateGravity: "" },
     });
   },
-
-  // ─── Versions ──────────────────────────────────────────────────────────────
 
   async getVersions(instance: PiholeInstance): Promise<PiholeVersions> {
     if (instance.apiVersion === "v6") {
@@ -739,30 +657,20 @@ const PiholeApiService = {
         }>("/api/info/version");
         return {
           core_current:
-            data.version?.core?.local?.version ??
-            data.version?.core?.tag ??
-            undefined,
+            data.version?.core?.local?.version ?? data.version?.core?.tag,
           FTL_current:
-            data.version?.FTL?.local?.version ??
-            data.version?.FTL?.tag ??
-            undefined,
+            data.version?.FTL?.local?.version ?? data.version?.FTL?.tag,
           web_current:
-            data.version?.web?.local?.version ??
-            data.version?.web?.tag ??
-            undefined,
+            data.version?.web?.local?.version ?? data.version?.web?.tag,
         };
       });
     }
     const { data } = await v5Client(instance).get<PiholeVersions>(
       "/admin/api.php",
-      {
-        params: { versions: "" },
-      },
+      { params: { versions: "" } },
     );
     return data;
   },
-
-  // ─── System Info ───────────────────────────────────────────────────────────
 
   async getSystemInfo(
     instance: PiholeInstance,
@@ -776,65 +684,38 @@ const PiholeApiService = {
               cpu?: {
                 nprocs?: number;
                 "%cpu"?: number;
-                load?: { raw?: number[]; percent?: number[] };
+                load?: { percent?: number[] };
               };
               memory?: {
-                ram?: {
-                  total?: number;
-                  used?: number;
-                  free?: number;
-                  available?: number;
-                  "%used"?: number;
-                };
+                ram?: { total?: number; used?: number; "%used"?: number };
               };
               sensors?: Array<{ name: string; value: number; prefix: string }>;
               hostname?: string;
             };
           }>("/api/info/system");
-
           const sys = data.system;
           if (!sys) return {};
-
-          // CPU: use '%cpu' directly (instantaneous %) or load.percent[0]
-          const cpuPercent =
-            sys.cpu?.["%cpu"] != null
-              ? String(sys.cpu["%cpu"])
-              : Array.isArray(sys.cpu?.load?.percent) &&
-                  sys.cpu.load.percent.length
-                ? String(sys.cpu.load.percent[0])
-                : undefined;
-
-          // Temperature from sensors array (°C sensor)
+          const cpuPercent = sys.cpu?.["%cpu"] ?? sys.cpu?.load?.percent?.[0];
           const tempSensor =
             sys.sensors?.find(
               (s) => s.name.toLowerCase().includes("cpu") && s.prefix === "°C",
             ) ?? sys.sensors?.find((s) => s.prefix === "°C");
-
-          // Memory percent: use '%used' field directly
-          const memPercent =
-            sys.memory?.ram?.["%used"] != null
-              ? String(sys.memory.ram["%used"])
-              : undefined;
+          const memPercent = sys.memory?.ram?.["%used"];
 
           return {
-            ...(cpuPercent !== undefined && { cpu_percent: cpuPercent }),
+            ...(cpuPercent != null && { cpu_percent: String(cpuPercent) }),
             ...(tempSensor != null && { cpu_temp: String(tempSensor.value) }),
             ...(sys.cpu?.nprocs != null && {
               cpu_cores: String(sys.cpu.nprocs),
             }),
-            // v6 memory values are in KB — multiply by 1024 to get bytes for formatBytes()
             ...(sys.memory?.ram?.total != null && {
               mem_total: String(sys.memory.ram.total * 1024),
             }),
             ...(sys.memory?.ram?.used != null && {
               mem_used: String(sys.memory.ram.used * 1024),
             }),
-            ...(sys.memory?.ram?.free != null && {
-              mem_free: String(sys.memory.ram.free * 1024),
-            }),
-            // Round %used to one decimal place
-            ...(memPercent !== undefined && {
-              mem_percent: String(parseFloat(memPercent).toFixed(1)),
+            ...(memPercent != null && {
+              mem_percent: String(memPercent.toFixed(1)),
             }),
             ...(sys.uptime != null && { uptime: String(sys.uptime) }),
             ...(sys.hostname != null && { hostname: String(sys.hostname) }),
@@ -844,7 +725,6 @@ const PiholeApiService = {
         return {};
       }
     }
-    // v5: undocumented api_FTL.php endpoint
     try {
       const { data } = await v5Client(instance).get<Record<string, string>>(
         "/admin/api_FTL.php",
@@ -856,8 +736,6 @@ const PiholeApiService = {
     }
   },
 
-  // ─── Connection Test ───────────────────────────────────────────────────────
-
   async testConnection(
     instance: PiholeInstance,
   ): Promise<ConnectionTestResult> {
@@ -865,28 +743,21 @@ const PiholeApiService = {
     try {
       const data = await PiholeApiService.getSummary(instance);
       const latencyMs = Date.now() - start;
-      if (!data || data.status === undefined) {
+      if (!data || data.status === undefined)
         return {
           ok: false,
-          message: "Connected but invalid response — check credentials",
+          message: "Connected but invalid response",
           latencyMs,
         };
-      }
       return { ok: true, message: "Connection successful", latencyMs };
     } catch (err) {
       const latencyMs = Date.now() - start;
-      const msg = errorMessage(err);
-      // Clear session on auth failure so the next attempt gets a fresh login
-      const status = (err as { response?: { status?: number } })?.response
-        ?.status;
-      if (instance.apiVersion === "v6" && (status === 401 || status === 403)) {
+      const status = (err as any)?.response?.status;
+      if (instance.apiVersion === "v6" && (status === 401 || status === 403))
         clearV6Session(instance.id);
-      }
-      return { ok: false, message: msg, latencyMs };
+      return { ok: false, message: errorMessage(err), latencyMs };
     }
   },
-
-  // ─── Utilities ─────────────────────────────────────────────────────────────
 
   formatUptime(seconds: number | null): string | null {
     if (seconds == null || isNaN(seconds)) return null;
@@ -900,19 +771,15 @@ const PiholeApiService = {
     return parts.length ? parts.join(" ") : "<1m";
   },
 
-  /** Clear a v6 session — used by InstanceForm on URL/token change */
   clearSession(instanceId: string): void {
     clearV6Session(instanceId);
   },
-
   errorMessage,
 };
 
 export default PiholeApiService;
-export { createClient as _v5Client, v6Client as _v6Client, ensureV6Session };
+export { v5Client as _v5Client, v6Client as _v6Client, ensureV6Session };
 
-// Keep createClient export for tests that mock it
-function createClient(instance: PiholeInstance): AxiosInstance {
+export function createClient(instance: PiholeInstance): AxiosInstance {
   return instance.apiVersion === "v6" ? v6Client(instance) : v5Client(instance);
 }
-export { createClient };
