@@ -189,10 +189,10 @@ export default defineComponent({
       theme: savedTheme as "dark" | "light",
       navItems: [
         { path: "/dashboard", label: "Dashboard", icon: gridOutline },
+        { path: "/statistics", label: "Statistics", icon: statsChartOutline },
         { path: "/query-log", label: "Query Log", icon: listOutline },
         { path: "/blocklists", label: "Block Lists", icon: shieldOutline },
         { path: "/hardware", label: "Hardware", icon: hardwareChipOutline },
-        { path: "/statistics", label: "Statistics", icon: statsChartOutline },
         { path: "/settings", label: "Settings", icon: settingsOutline },
         { path: "/docs", label: "Documentation", icon: bookOutline },
       ],
