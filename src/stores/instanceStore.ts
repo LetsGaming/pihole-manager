@@ -1,16 +1,30 @@
 /**
- * Instance Store
+ * Instance Store — rewritten
  *
- * Manages Pi-hole instances: CRUD, status polling, summary data, blocking control.
- * Persists to localStorage under STORAGE_KEY.
+ * Key design decisions:
  *
- * Status resilience: an instance is only marked offline after
- * OFFLINE_THRESHOLD consecutive failed refreshes. One transient error
- * (network hiccup, slow response, tab switch) does not flip the status.
+ * 1. SINGLE POLLING OWNER
+ *    The store owns the 30 s poll loop exclusively. Views must not call
+ *    refreshAll / startPolling / loadFromStorage. Legacy call sites are kept
+ *    as no-ops so nothing throws.
  *
- * Reactivity note: all per-instance state objects (summaryData, errors,
- * loading, _failCount) are replaced via full object spread on every write
- * so Vue's reactivity system always detects the change.
+ * 2. DEDUPLICATED REFRESHES
+ *    Only one getSummary request is allowed in-flight per instance at a time.
+ *    If refreshInstance is called while a request is already pending, the new
+ *    call is dropped (the in-flight one will still update state when it lands).
+ *    This eliminates all races from multiple concurrent polls.
+ *
+ * 3. BLOCKING TOGGLE OWNS THE STATUS
+ *    disableBlocking / enableBlocking increment a per-instance
+ *    _blockingInFlight counter BEFORE the optimistic write.
+ *    refreshInstance checks the counter at WRITE TIME (not fetch-start time),
+ *    so any getSummary response that resolves while a toggle is in-flight is
+ *    silently dropped for the status field only. The counter is decremented
+ *    in a finally block so it always clears.
+ *
+ * 4. NO STALE WRITES FROM VIEWS
+ *    Views call instanceStore.refreshInstance(id) for the manual refresh
+ *    button only. All other refreshes go through the store's own poll.
  */
 
 import { defineStore } from "pinia";
@@ -22,44 +36,42 @@ import type {
 } from "@/types/instance";
 import type { PiholeSummary } from "@/types/api";
 
-const STORAGE_KEY = "orbital_instances";
-const POLL_INTERVAL_MS = 30_000;
-/** Number of consecutive failures before an instance is marked offline */
+const STORAGE_KEY       = "orbital_instances";
+const POLL_INTERVAL_MS  = 30_000;
 const OFFLINE_THRESHOLD = 2;
 
-interface InstanceStoreState {
-  instances: PiholeInstance[];
-  activeInstanceId: string | null;
-  summaryData: Record<string, PiholeSummary>;
-  errors: Record<string, string | null>;
-  loading: Record<string, boolean>;
-  /** Consecutive failure count per instance — not persisted */
-  _failCount: Record<string, number>;
-  _pollHandle: ReturnType<typeof setInterval> | null;
-  /**
-   * Blocking status that was just confirmed by a toggle API call.
-   * refreshInstance will preserve this value instead of overwriting it with
-   * a potentially stale getSummary response, then clear it once the Pi-hole
-   * confirms the same state on the next poll.
-   */
-  _lockedStatus: Record<string, "enabled" | "disabled">;
-}
-
 interface PersistedState {
-  instances: PiholeInstance[];
+  instances:        PiholeInstance[];
   activeInstanceId: string | null;
 }
 
-export const useInstanceStore = defineStore("instances", {
+interface InstanceStoreState {
+  instances:         PiholeInstance[];
+  activeInstanceId:  string | null;
+  summaryData:       Record<string, PiholeSummary>;
+  errors:            Record<string, string | null>;
+  loading:           Record<string, boolean>;
+  _failCount:        Record<string, number>;
+  /** >0 while a blocking toggle API call is in-flight for this instance. */
+  _blockingInFlight: Record<string, number>;
+  /** >0 while a getSummary request is in-flight for this instance. */
+  _refreshInFlight:  Record<string, number>;
+  _pollHandle:       ReturnType<typeof setInterval> | null;
+  _booted:           boolean;
+}
+
+export const useInstanceStore = defineStore("instance", {
   state: (): InstanceStoreState => ({
-    instances: [],
-    activeInstanceId: null,
-    summaryData: {},
-    errors: {},
-    loading: {},
-    _failCount: {},
-    _pollHandle: null,
-    _lockedStatus: {},
+    instances:         [],
+    activeInstanceId:  null,
+    summaryData:       {},
+    errors:            {},
+    loading:           {},
+    _failCount:        {},
+    _blockingInFlight: {},
+    _refreshInFlight:  {},
+    _pollHandle:       null,
+    _booted:           false,
   }),
 
   getters: {
@@ -100,17 +112,26 @@ export const useInstanceStore = defineStore("instances", {
   },
 
   actions: {
-    // ── Persistence ─────────────────────────────────────────────────────────
+    // ── Boot ─────────────────────────────────────────────────────────────────
 
-    loadFromStorage(): void {
+    _boot(): void {
+      if (this._booted) return;
+      this._booted = true;
+      this._loadFromStorage();
+      void this.refreshAll();
+      this._startPolling();
+    },
+
+    // ── Persistence ──────────────────────────────────────────────────────────
+
+    _loadFromStorage(): void {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) return;
         const parsed = JSON.parse(raw) as PersistedState;
-        this.instances = parsed.instances ?? [];
+        this.instances        = parsed.instances ?? [];
         this.activeInstanceId = parsed.activeInstanceId ?? null;
 
-        // Ensure activeInstanceId points to a real instance
         if (
           this.activeInstanceId &&
           !this.instances.find((i) => i.id === this.activeInstanceId)
@@ -118,54 +139,61 @@ export const useInstanceStore = defineStore("instances", {
           this.activeInstanceId = this.instances[0]?.id ?? null;
         }
 
-        // Initialise transient state for every restored instance
-        const failCount: Record<string, number> = {};
-        const loading: Record<string, boolean> = {};
-        const errors: Record<string, string | null> = {};
+        // Initialise all transient maps
+        const failCount:        Record<string, number>        = {};
+        const loading:          Record<string, boolean>       = {};
+        const errors:           Record<string, string | null> = {};
+        const blockingInFlight: Record<string, number>        = {};
+        const refreshInFlight:  Record<string, number>        = {};
+
         this.instances.forEach((i) => {
-          failCount[i.id] = 0;
-          loading[i.id]   = false;
-          errors[i.id]    = null;
+          failCount[i.id]        = 0;
+          loading[i.id]          = false;
+          errors[i.id]           = null;
+          blockingInFlight[i.id] = 0;
+          refreshInFlight[i.id]  = 0;
         });
-        this._failCount = failCount;
-        this.loading    = loading;
-        this.errors     = errors;
+
+        this._failCount        = failCount;
+        this.loading           = loading;
+        this.errors            = errors;
+        this._blockingInFlight = blockingInFlight;
+        this._refreshInFlight  = refreshInFlight;
       } catch (err) {
-        console.error("[InstanceStore] loadFromStorage failed:", err);
+        console.error("[InstanceStore] _loadFromStorage failed:", err);
       }
     },
 
     _saveToStorage(): void {
       try {
-        const payload: PersistedState = {
-          instances: this.instances,
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          instances:        this.instances,
           activeInstanceId: this.activeInstanceId,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+        } satisfies PersistedState));
       } catch (err) {
         console.error("[InstanceStore] _saveToStorage failed:", err);
       }
     },
 
-    // ── CRUD ────────────────────────────────────────────────────────────────
+    // ── CRUD ─────────────────────────────────────────────────────────────────
 
     addInstance(config: NewInstanceConfig): PiholeInstance {
       const instance: PiholeInstance = {
-        id: `ph_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: config.name,
-        url: config.url.replace(/\/$/, ""),
-        apiToken: config.apiToken,
+        id:         `ph_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name:       config.name,
+        url:        config.url.replace(/\/$/, ""),
+        apiToken:   config.apiToken,
         apiVersion: config.apiVersion ?? "v5",
-        status: "unknown",
-        addedAt: new Date().toISOString(),
+        status:     "unknown",
+        addedAt:    new Date().toISOString(),
       };
 
-      this.instances = [...this.instances, instance];
-
-      // Initialise all per-instance reactive maps with new entry
-      this._failCount = { ...this._failCount, [instance.id]: 0 };
-      this.loading    = { ...this.loading,    [instance.id]: false };
-      this.errors     = { ...this.errors,     [instance.id]: null };
+      this.instances         = [...this.instances, instance];
+      this._failCount        = { ...this._failCount,        [instance.id]: 0 };
+      this.loading           = { ...this.loading,           [instance.id]: false };
+      this.errors            = { ...this.errors,            [instance.id]: null };
+      this._blockingInFlight = { ...this._blockingInFlight, [instance.id]: 0 };
+      this._refreshInFlight  = { ...this._refreshInFlight,  [instance.id]: 0 };
 
       if (!this.activeInstanceId) this.activeInstanceId = instance.id;
       this._saveToStorage();
@@ -180,18 +208,12 @@ export const useInstanceStore = defineStore("instances", {
       const allowed = ["name", "url", "apiToken", "apiVersion"] as const;
       const updated = { ...this.instances[idx] };
       allowed.forEach((key) => {
-        if (key in updates) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          (updated as any)[key] = (updates as any)[key];
-        }
+        if (key in updates) (updated as any)[key] = (updates as any)[key]; // eslint-disable-line @typescript-eslint/no-explicit-any
       });
 
-      // Replace array immutably for reactivity
-      const newInstances = [...this.instances];
-      newInstances[idx] = updated;
-      this.instances = newInstances;
-
-      // Reset fail counter so updated credentials get a fresh chance
+      const next = [...this.instances];
+      next[idx]  = updated;
+      this.instances  = next;
       this._failCount = { ...this._failCount, [id]: 0 };
       this._saveToStorage();
       void this.refreshInstance(id);
@@ -200,15 +222,18 @@ export const useInstanceStore = defineStore("instances", {
     removeInstance(id: string): void {
       this.instances = this.instances.filter((i) => i.id !== id);
 
-      // Remove from all reactive maps
-      const { [id]: _s, ...restSummary } = this.summaryData;
-      const { [id]: _e, ...restErrors  } = this.errors;
-      const { [id]: _l, ...restLoading } = this.loading;
-      const { [id]: _f, ...restFail    } = this._failCount;
-      this.summaryData = restSummary;
-      this.errors      = restErrors;
-      this.loading     = restLoading;
-      this._failCount  = restFail;
+      const { [id]: _s, ...s } = this.summaryData;
+      const { [id]: _e, ...e } = this.errors;
+      const { [id]: _l, ...l } = this.loading;
+      const { [id]: _f, ...f } = this._failCount;
+      const { [id]: _b, ...b } = this._blockingInFlight;
+      const { [id]: _r, ...r } = this._refreshInFlight;
+      this.summaryData       = s;
+      this.errors            = e;
+      this.loading           = l;
+      this._failCount        = f;
+      this._blockingInFlight = b;
+      this._refreshInFlight  = r;
 
       if (this.activeInstanceId === id) {
         this.activeInstanceId = this.instances[0]?.id ?? null;
@@ -229,45 +254,39 @@ export const useInstanceStore = defineStore("instances", {
       const instance = this.instances.find((i) => i.id === id);
       if (!instance) return;
 
-      // Mark as loading — use spread to trigger reactivity
-      this.loading = { ...this.loading, [id]: true };
-      this.errors  = { ...this.errors,  [id]: null };
+      // DEDUPLICATION: if a request is already in-flight, drop this call.
+      // The pending request will update state when it resolves.
+      if ((this._refreshInFlight[id] ?? 0) > 0) return;
+
+      this._refreshInFlight = { ...this._refreshInFlight, [id]: 1 };
+      this.loading          = { ...this.loading,          [id]: true };
+      this.errors           = { ...this.errors,           [id]: null };
 
       try {
         const summary = await PiholeApiService.getSummary(instance);
 
-        // If a toggle just confirmed a specific status, preserve it rather than
-        // overwriting with the getSummary response, which may still reflect the
-        // old state due to Pi-hole propagation delay.
-        // Once the Pi-hole itself agrees with the locked status, clear the lock.
-        const locked = this._lockedStatus[id];
-        const resolvedStatus = locked !== undefined ? locked : summary.status;
-        if (locked !== undefined && summary.status === locked) {
-          // Pi-hole confirmed the toggled state — release the lock
-          const { [id]: _, ...rest } = this._lockedStatus;
-          this._lockedStatus = rest;
-        }
+        // WRITE-TIME CHECK: if a blocking toggle is still in-flight, discard
+        // the status from this poll response entirely — the toggle owns the
+        // status until its own API call resolves and writes the confirmed value.
+        const blockingOwned = (this._blockingInFlight[id] ?? 0) > 0;
+        const safeStatus    = blockingOwned
+          ? (this.summaryData[id]?.status ?? summary.status)
+          : summary.status;
 
-        // Immutably update summaryData so Vue detects the change
         this.summaryData = {
           ...this.summaryData,
-          [id]: { ...summary, status: resolvedStatus },
+          [id]: { ...summary, status: safeStatus },
         };
-
-        // Reset failure counter and mark online
         this._failCount = { ...this._failCount, [id]: 0 };
-        this._setStatus(id, "online");
+        this._setInstanceStatus(id, "online");
       } catch (err) {
-        const failCount = (this._failCount[id] ?? 0) + 1;
-        this._failCount = { ...this._failCount, [id]: failCount };
+        const count     = (this._failCount[id] ?? 0) + 1;
+        this._failCount = { ...this._failCount, [id]: count };
         this.errors     = { ...this.errors, [id]: PiholeApiService.errorMessage(err) };
-
-        if (failCount >= OFFLINE_THRESHOLD) {
-          this._setStatus(id, "offline");
-        }
-        // Below threshold: keep current status — avoids false-positive offline flash
+        if (count >= OFFLINE_THRESHOLD) this._setInstanceStatus(id, "offline");
       } finally {
-        this.loading = { ...this.loading, [id]: false };
+        this._refreshInFlight = { ...this._refreshInFlight, [id]: 0 };
+        this.loading          = { ...this.loading,          [id]: false };
       }
     },
 
@@ -277,29 +296,24 @@ export const useInstanceStore = defineStore("instances", {
       );
     },
 
-    /**
-     * Immutably patch only the blocking status field inside summaryData for
-     * one instance. Used for optimistic UI updates before the re-fetch confirms.
-     */
-    _patchSummaryStatus(id: string, blockingStatus: "enabled" | "disabled"): void {
-      // Lock this status so refreshInstance won't overwrite it with a stale
-      // poll response until the Pi-hole itself confirms the new state.
-      this._lockedStatus = { ...this._lockedStatus, [id]: blockingStatus };
-      const existing = this.summaryData[id];
-      if (!existing) return; // no summary yet — nothing to patch
-      this.summaryData = {
-        ...this.summaryData,
-        [id]: { ...existing, status: blockingStatus },
-      };
-    },
+    // ── Internal helpers ─────────────────────────────────────────────────────
 
-    /** Immutably update the status field of a single instance. */
-    _setStatus(id: string, status: PiholeInstance["status"]): void {
+    _setInstanceStatus(id: string, status: PiholeInstance["status"]): void {
       const idx = this.instances.findIndex((i) => i.id === id);
       if (idx === -1) return;
-      const newInstances = [...this.instances];
-      newInstances[idx] = { ...newInstances[idx], status };
-      this.instances = newInstances;
+      const next = [...this.instances];
+      next[idx]  = { ...next[idx], status };
+      this.instances = next;
+    },
+
+    /**
+     * Write a blocking status directly into summaryData.
+     * Only called by blocking toggle actions — never by poll-driven code.
+     */
+    _writeSummaryStatus(id: string, status: "enabled" | "disabled"): void {
+      const existing = this.summaryData[id];
+      if (!existing) return;
+      this.summaryData = { ...this.summaryData, [id]: { ...existing, status } };
     },
 
     // ── Blocking Control ─────────────────────────────────────────────────────
@@ -307,20 +321,53 @@ export const useInstanceStore = defineStore("instances", {
     async enableBlocking(id: string): Promise<void> {
       const inst = this.instances.find((i) => i.id === id);
       if (!inst) throw new Error("Instance not found");
-      this._patchSummaryStatus(id, "enabled");           // optimistic
-      const result = await PiholeApiService.enableBlocking(inst);
-      this._patchSummaryStatus(id, result.status);       // confirmed by POST response
-      // No immediate refreshInstance — _lockedStatus protects against stale polls.
-      // Stats numbers (query counts etc.) will sync on the next 30 s poll.
+
+      // Grab the counter BEFORE the optimistic write so any getSummary that
+      // is already in-flight and resolves after this point will see > 0.
+      this._blockingInFlight = {
+        ...this._blockingInFlight,
+        [id]: (this._blockingInFlight[id] ?? 0) + 1,
+      };
+      this._writeSummaryStatus(id, "enabled");
+
+      try {
+        const result = await PiholeApiService.enableBlocking(inst);
+        this._writeSummaryStatus(id, result.status);
+      } catch (err) {
+        // On error, revert optimistic write so UI isn't stuck
+        this._writeSummaryStatus(id, "disabled");
+        throw err;
+      } finally {
+        this._blockingInFlight = {
+          ...this._blockingInFlight,
+          [id]: Math.max(0, (this._blockingInFlight[id] ?? 1) - 1),
+        };
+      }
     },
 
     async disableBlocking(id: string, seconds = 0): Promise<void> {
       const inst = this.instances.find((i) => i.id === id);
       if (!inst) throw new Error("Instance not found");
-      this._patchSummaryStatus(id, "disabled");          // optimistic
-      const result = await PiholeApiService.disableBlocking(inst, seconds);
-      this._patchSummaryStatus(id, result.status);       // confirmed by POST response
-      // No immediate refreshInstance — _lockedStatus protects against stale polls.
+
+      this._blockingInFlight = {
+        ...this._blockingInFlight,
+        [id]: (this._blockingInFlight[id] ?? 0) + 1,
+      };
+      this._writeSummaryStatus(id, "disabled");
+
+      try {
+        const result = await PiholeApiService.disableBlocking(inst, seconds);
+        this._writeSummaryStatus(id, result.status);
+      } catch (err) {
+        // Revert optimistic write
+        this._writeSummaryStatus(id, "enabled");
+        throw err;
+      } finally {
+        this._blockingInFlight = {
+          ...this._blockingInFlight,
+          [id]: Math.max(0, (this._blockingInFlight[id] ?? 1) - 1),
+        };
+      }
     },
 
     async enableAllBlocking(): Promise<void> {
@@ -341,16 +388,21 @@ export const useInstanceStore = defineStore("instances", {
 
     // ── Polling ──────────────────────────────────────────────────────────────
 
-    startPolling(intervalMs = POLL_INTERVAL_MS): void {
-      if (this._pollHandle) return; // already running
-      this._pollHandle = setInterval(() => void this.refreshAll(), intervalMs);
+    _startPolling(): void {
+      if (this._pollHandle !== null) return;
+      this._pollHandle = setInterval(() => void this.refreshAll(), POLL_INTERVAL_MS);
     },
 
-    stopPolling(): void {
-      if (this._pollHandle) {
+    _stopPolling(): void {
+      if (this._pollHandle !== null) {
         clearInterval(this._pollHandle);
         this._pollHandle = null;
       }
     },
+
+    // ── Legacy no-op shims (called from views, now handled by _boot) ─────────
+    loadFromStorage(): void { /* no-op */ },
+    startPolling():    void { /* no-op */ },
+    stopPolling():     void { /* no-op */ },
   },
 });

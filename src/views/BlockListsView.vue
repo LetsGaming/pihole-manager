@@ -88,9 +88,11 @@
               <div class="flex gap-2">
                 <button
                   class="btn btn-ghost btn-sm"
+                  :disabled="isGravityLoading"
                   @click="triggerGravityUpdate"
                 >
-                  <ion-icon :icon="cloudDownloadOutline" /> Update Gravity
+                  <ion-icon :icon="isGravityLoading ? syncOutline : cloudDownloadOutline" :class="{ 'spin': isGravityLoading }" />
+                  {{ isGravityLoading ? 'Updating...' : 'Update Gravity' }}
                 </button>
                 <button class="btn btn-ghost btn-sm" @click="loadAdlists">
                   <ion-icon :icon="refreshOutline" />
@@ -248,6 +250,7 @@ import {
   refreshOutline,
   copyOutline,
   trashOutline,
+  syncOutline,
 } from "ionicons/icons";
 
 import PageHeader from "@/components/ui/PageHeader.vue";
@@ -257,6 +260,7 @@ import InstanceTabBar from "@/components/blocklists/InstanceTabBar.vue";
 import AddDomainForm from "@/components/blocklists/AddDomainForm.vue";
 import DomainListTable from "@/components/blocklists/DomainListTable.vue";
 
+import { mapStores } from "pinia";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useClipboard } from "@/composables/useClipboard";
@@ -322,6 +326,7 @@ export default defineComponent({
       selectedInstanceId: null as string | null,
       activeTab: "adlists" as string,
       isLoading: false as boolean,
+      isGravityLoading: false as boolean,
       rawAdlists: markRaw([] as Adlist[]),
       sortedAdlists: [] as Adlist[],
       adlistSortKey: "" as string,
@@ -341,13 +346,12 @@ export default defineComponent({
       refreshOutline,
       copyOutline,
       trashOutline,
+      syncOutline,
     };
   },
 
   computed: {
-    instanceStore() {
-      return useInstanceStore();
-    },
+    ...mapStores(useInstanceStore),
 
     currentInstance() {
       return (
@@ -356,7 +360,6 @@ export default defineComponent({
         ) ?? null
       );
     },
-
     currentTabLabel(): string {
       return LIST_TABS.find((t) => t.key === this.activeTab)?.label ?? "";
     },
@@ -369,7 +372,6 @@ export default defineComponent({
   },
 
   mounted() {
-    this.instanceStore.loadFromStorage();
     this.selectedInstanceId =
       this.instanceStore.activeInstanceId ??
       this.instanceStore.instances[0]?.id ??
@@ -517,13 +519,14 @@ export default defineComponent({
 
     async triggerGravityUpdate(): Promise<void> {
       if (!this.currentInstance) return;
+      this.isGravityLoading = true;
       try {
         await PiholeApiService.updateGravity(this.currentInstance);
-        useNotificationStore().info(
-          "Gravity update triggered (runs in background)",
-        );
+        useNotificationStore().success("Gravity update triggered — running in background");
       } catch (err) {
         useNotificationStore().error(`Failed: ${(err as Error).message}`);
+      } finally {
+        this.isGravityLoading = false;
       }
     },
   },
@@ -574,5 +577,13 @@ export default defineComponent({
 .suggested-lists {
   padding-top: 8px;
   border-top: 1px solid var(--border-subtle);
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
 }
 </style>

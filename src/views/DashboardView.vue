@@ -119,6 +119,7 @@ import StatsOverviewCards from "@/components/statistics/StatsOverviewCards.vue";
 import InstanceCard from "@/components/dashboard/InstanceCard.vue";
 import DisableBlockingModal from "@/components/dashboard/DisableBlockingModal.vue";
 
+import { mapStores } from "pinia";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useFormatting } from "@/composables/useFormatting";
 import { useBlockingControl } from "@/composables/useBlockingControl";
@@ -154,9 +155,7 @@ export default defineComponent({
   },
 
   computed: {
-    instanceStore() {
-      return useInstanceStore();
-    },
+    ...mapStores(useInstanceStore),
 
     anyLoading(): boolean {
       return Object.values(this.instanceStore.loading).some(Boolean);

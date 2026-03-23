@@ -170,6 +170,7 @@ import SortableHeader from "@/components/ui/SortableHeader.vue";
 import QueryLogToolbar from "@/components/querylog/QueryLogToolbar.vue";
 import QueryLogRow from "@/components/querylog/QueryLogRow.vue";
 
+import { mapStores } from "pinia";
 import { useInstanceStore } from "@/stores/instanceStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useClipboard } from "@/composables/useClipboard";
@@ -251,9 +252,7 @@ export default defineComponent({
   },
 
   computed: {
-    instanceStore() {
-      return useInstanceStore();
-    },
+    ...mapStores(useInstanceStore),
   },
 
   watch: {
@@ -270,11 +269,8 @@ export default defineComponent({
   },
 
   mounted() {
-    this.instanceStore.loadFromStorage();
-    void this.instanceStore.refreshAll().then(() => {
-      void this.fetchLog();
-      this.startLive();
-    });
+    void this.fetchLog();
+    this.startLive();
   },
 
   beforeUnmount() {

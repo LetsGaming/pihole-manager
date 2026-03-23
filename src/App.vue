@@ -158,6 +158,7 @@ import {
   statsChartOutline,
 } from "ionicons/icons";
 import { useRoute } from "vue-router";
+import { mapStores } from "pinia";
 import { useInstanceStore } from "@/stores/instanceStore";
 import ToastContainer from "@/components/ToastContainer.vue";
 
@@ -199,9 +200,7 @@ export default defineComponent({
   },
 
   computed: {
-    instanceStore() {
-      return useInstanceStore();
-    },
+    ...mapStores(useInstanceStore),
     route() {
       return useRoute();
     },
@@ -214,9 +213,7 @@ export default defineComponent({
     // Apply theme to document root for CSS variable resolution
     document.documentElement.setAttribute("data-theme", this.theme);
     // Bootstrap instance data
-    this.instanceStore.loadFromStorage();
-    void this.instanceStore.refreshAll();
-    this.instanceStore.startPolling();
+    this.instanceStore._boot();
   },
 
   beforeUnmount() {

@@ -10,7 +10,7 @@
         >
           <option value="__all__">All Instances</option>
           <option
-            v-for="inst in instancesStore.instances"
+            v-for="inst in instanceStore.instances"
             :key="inst.id"
             :value="inst.id"
           >
@@ -22,7 +22,7 @@
 
     <ion-content class="page-content">
       <EmptyState
-        v-if="!instancesStore.instances.length"
+        v-if="!instanceStore.instances.length"
         title="No instances configured"
         subtitle="Go to Settings to add your first Pi-hole instance."
       />
@@ -179,7 +179,7 @@ export default defineComponent({
     currentInstance() {
       if (this.isAllMode) return null;
       return (
-        this.instancesStore.instances.find(
+        this.instanceStore.instances.find(
           (i) => i.id === this.selectedInstanceId,
         ) ?? null
       );
@@ -201,11 +201,11 @@ export default defineComponent({
     displaySummary(): PiholeSummary | null {
       if (!this.isAllMode) {
         return this.selectedInstanceId
-          ? (this.instancesStore.summaryData[this.selectedInstanceId] ?? null)
+          ? (this.instanceStore.summaryData[this.selectedInstanceId] ?? null)
           : null;
       }
 
-      const instances = this.instancesStore.instances;
+      const instances = this.instanceStore.instances;
       if (!instances.length) return null;
 
       let totalQueries = 0;
@@ -214,7 +214,7 @@ export default defineComponent({
       let hasData = false;
 
       instances.forEach((inst) => {
-        const s = this.instancesStore.summaryData[inst.id];
+        const s = this.instanceStore.summaryData[inst.id];
         if (!s) return;
         hasData = true;
         totalQueries += Number(s.dns_queries_today) || 0;
@@ -240,7 +240,7 @@ export default defineComponent({
       instances.forEach((inst) => {
         domainsBeingBlocked +=
           Number(
-            this.instancesStore.summaryData[inst.id]?.domains_being_blocked,
+            this.instanceStore.summaryData[inst.id]?.domains_being_blocked,
           ) || 0;
       });
 
@@ -263,21 +263,17 @@ export default defineComponent({
   },
 
   mounted() {
-    this.instancesStore.loadFromStorage();
-    void this.instancesStore.refreshAll();
-    this.instancesStore.startPolling();
-
     // Default: aggregate view when multiple instances, single instance otherwise
     this.selectedInstanceId =
-      this.instancesStore.instances.length === 1
-        ? this.instancesStore.instances[0].id
+      this.instanceStore.instances.length === 1
+        ? this.instanceStore.instances[0].id
         : "__all__";
 
     void this.loadData();
   },
 
   beforeUnmount() {
-    this.instancesStore.stopPolling();
+    this.instanceStore.stopPolling();
   },
 
   methods: {
@@ -344,7 +340,7 @@ export default defineComponent({
     // ── All instances ────────────────────────────────────────────────────────
 
     async loadAllInstancesData(): Promise<void> {
-      const instances = this.instancesStore.instances.filter(
+      const instances = this.instanceStore.instances.filter(
         (i) => i.status !== "offline",
       );
       if (!instances.length) return;

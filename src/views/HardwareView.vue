@@ -62,39 +62,79 @@ export default defineComponent({
       notifications: useNotificationStore(),
       hwData: {} as Record<string, HardwareInfo>,
       loading: {} as Record<string, boolean>,
+      // Track in-flight fetches per instance to prevent concurrent races
+      _inFlight: {} as Record<string, boolean>,
       refreshHandle: null as ReturnType<typeof setInterval> | null,
+      _started: false,
       refreshOutline,
       hardwareChipOutline,
     };
   },
 
+  // ionViewDidEnter fires once per navigation into the view, avoiding the
+  // Ionic keep-alive double-mount that caused the first-load flash-to-null.
+  ionViewDidEnter() {
+    this._startIfNeeded();
+  },
+
+  // Fallback for non-Ionic environments / unit tests
   mounted() {
-    this.instanceStore.loadFromStorage();
-    void this.refreshAll();
-    this.refreshHandle = setInterval(
-      () => void this.refreshAll(),
-      REFRESH_INTERVAL_MS,
-    );
+    this._startIfNeeded();
+  },
+
+  // ionViewDidLeave fires when navigating away — stop the interval so we
+  // don't accumulate multiple polling loops across navigations.
+  ionViewDidLeave() {
+    this._stopPolling();
   },
 
   beforeUnmount() {
-    if (this.refreshHandle !== null) clearInterval(this.refreshHandle);
+    this._stopPolling();
   },
 
   methods: {
+    _startIfNeeded() {
+      if (this._started) return;
+      this._started = true;
+      void this.refreshAll();
+      this.refreshHandle = setInterval(
+        () => void this.refreshAll(),
+        REFRESH_INTERVAL_MS,
+      );
+    },
+
+    _stopPolling() {
+      if (this.refreshHandle !== null) {
+        clearInterval(this.refreshHandle);
+        this.refreshHandle = null;
+      }
+      this._started = false;
+    },
+
     async fetchHardware(
       inst: ReturnType<typeof useInstanceStore>["instances"][0],
     ) {
-      this.loading = { ...this.loading, [inst.id]: true };
+      // Drop concurrent fetches for the same instance — the in-flight one
+      // will write the result when it lands.
+      if (this._inFlight[inst.id]) return;
+      this._inFlight = { ...this._inFlight, [inst.id]: true };
+
+      // Only show the loading skeleton when we have no data yet.
+      // When we already have stale data, keep it visible to avoid flicker.
+      const hasExistingData = !!this.hwData[inst.id];
+      if (!hasExistingData) {
+        this.loading = { ...this.loading, [inst.id]: true };
+      }
+
       try {
-        this.hwData = {
-          ...this.hwData,
-          [inst.id]: await HardwareService.getHardwareInfo(inst),
-        };
+        const result = await HardwareService.getHardwareInfo(inst);
+        this.hwData = { ...this.hwData, [inst.id]: result };
       } catch (err) {
         this.notifications.error(
           `Hardware fetch failed for ${inst.name}: ${(err as Error).message}`,
         );
+        // Only write an empty placeholder when there is nothing to show yet,
+        // so the card doesn't revert from real data to "Waiting for data".
         if (!this.hwData[inst.id]) {
           this.hwData = {
             ...this.hwData,
@@ -124,6 +164,7 @@ export default defineComponent({
           };
         }
       } finally {
+        this._inFlight = { ...this._inFlight, [inst.id]: false };
         this.loading = { ...this.loading, [inst.id]: false };
       }
     },

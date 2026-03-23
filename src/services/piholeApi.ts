@@ -237,11 +237,11 @@ const PiholeApiService = {
             clients: { active: number; total: number };
             gravity: { domains_being_blocked: number; last_update?: number };
           }>("/api/stats/summary"),
-          client.get<{ blocking: boolean }>("/api/dns/blocking"),
+          client.get<{ blocking: "enabled" | "disabled" }>("/api/dns/blocking"),
         ]);
         const d = summaryRes.data;
         return {
-          status: blockingRes.data.blocking ? "enabled" : "disabled",
+          status: blockingRes.data.blocking === "enabled" ? "enabled" : "disabled",
           dns_queries_today: d.queries.total,
           ads_blocked_today: d.queries.blocked,
           ads_percentage_today: d.queries.percent_blocked,
@@ -273,10 +273,10 @@ const PiholeApiService = {
   ): Promise<{ status: BlockingStatus }> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        const { data } = await client.get<{ blocking: boolean }>(
+        const { data } = await client.get<{ blocking: "enabled" | "disabled" }>(
           "/api/dns/blocking",
         );
-        return { status: data.blocking ? "enabled" : "disabled" };
+        return { status: data.blocking === "enabled" ? "enabled" : "disabled" };
       });
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
@@ -291,12 +291,12 @@ const PiholeApiService = {
   ): Promise<{ status: BlockingStatus }> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        // POST returns { blocking: bool, timer: null } — use it as ground truth
-        const { data } = await client.post<{ blocking: boolean }>(
+        // POST returns { blocking: "enabled"|"disabled", timer: null }
+        const { data } = await client.post<{ blocking: "enabled" | "disabled" }>(
           "/api/dns/blocking",
           { blocking: true },
         );
-        return { status: data.blocking ? "enabled" : "disabled" };
+        return { status: data.blocking === "enabled" ? "enabled" : "disabled" };
       });
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
@@ -314,12 +314,12 @@ const PiholeApiService = {
       return v6Call(instance, async (client) => {
         const body: Record<string, unknown> = { blocking: false };
         if (seconds > 0) body.timer = seconds;
-        // POST returns { blocking: bool, timer: null } — use it as ground truth
-        const { data } = await client.post<{ blocking: boolean }>(
+        // POST returns { blocking: "enabled"|"disabled", timer: null }
+        const { data } = await client.post<{ blocking: "enabled" | "disabled" }>(
           "/api/dns/blocking",
           body,
         );
-        return { status: data.blocking ? "enabled" : "disabled" };
+        return { status: data.blocking === "enabled" ? "enabled" : "disabled" };
       });
     }
     const { data } = await v5Client(instance).get<{ status: BlockingStatus }>(
@@ -343,7 +343,7 @@ const PiholeApiService = {
             status: string;
             client: { ip: string };
           }>;
-        }>("/api/queries", { params: { length: count } });
+        }>("/api/queries", { params: { max_results: count } });
         return (data.queries ?? []).map((q) => ({
           timestamp: Math.round(q.time * 1000),
           type: q.type,
@@ -487,6 +487,7 @@ const PiholeApiService = {
             address: string;
             enabled: boolean;
             comment: string;
+            type?: string;
             number?: number;
           }>;
         }>("/api/lists", { params: { type: "block" } });
@@ -515,7 +516,8 @@ const PiholeApiService = {
       return v6Call(instance, async (client) => {
         const { data } = await client.post<{ error?: { message?: string } }>(
           "/api/lists",
-          { address: url, comment, type: "block", enabled: true },
+          { address: url, comment, enabled: true },
+          { params: { type: "block" } },
         );
         if (data.error)
           throw new Error(data.error.message ?? "Failed to add adlist");
@@ -576,14 +578,21 @@ const PiholeApiService = {
             domain: string;
             enabled: boolean;
             comment: string;
+            type?: string;
+            kind?: string;
           }>;
-        }>("/api/domains", { params: { type, kind } });
-        return (data.domains ?? []).map((d) => ({
-          id: d.id,
-          domain: d.domain,
-          enabled: d.enabled ? 1 : 0,
-          comment: d.comment ?? "",
-        }));
+        }>(`/api/domains/${type}/${kind}`);
+        // Pi-hole v6 ignores ?type and ?kind query params — use path segments
+        // instead. Filter client-side as a safety net in case the endpoint
+        // returns mixed results (e.g. regex entries alongside exact ones).
+        return (data.domains ?? [])
+          .filter((d) => (!d.type || d.type === type) && (!d.kind || d.kind === kind))
+          .map((d) => ({
+            id: d.id,
+            domain: d.domain,
+            enabled: d.enabled ? 1 : 0,
+            comment: d.comment ?? "",
+          }));
       });
     }
     const { data } = await v5Client(instance).get<{ data?: DomainEntry[] }>(
@@ -603,8 +612,8 @@ const PiholeApiService = {
       const { type, kind } = PiholeApiService._v6ListType(listType);
       return v6Call(instance, async (client) => {
         const { data } = await client.post<{ error?: { message?: string } }>(
-          "/api/domains",
-          { domain, comment, type, kind, enabled: true },
+          `/api/domains/${type}/${kind}`,
+          { domain, comment, enabled: true },
         );
         if (data.error)
           throw new Error(data.error.message ?? "Failed to add domain");

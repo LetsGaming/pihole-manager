@@ -263,7 +263,6 @@ export default defineComponent({
   },
 
   mounted() {
-    this.instanceStore.loadFromStorage();
     load();
   },
 

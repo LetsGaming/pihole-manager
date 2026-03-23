@@ -91,9 +91,20 @@ function piholeProxyMiddleware(): Connect.NextHandleFunction {
       }
     });
 
-    // Pipe request body (POST, PUT, PATCH)
+    // Buffer the full request body before forwarding so Content-Length is
+    // accurate. Piping directly can cause a mismatch if the browser sends a
+    // Content-Length header that the upstream server validates strictly (e.g.
+    // Pi-hole v6 FTL returns 400 when the length is wrong or the body arrives
+    // incomplete). GET/HEAD have no body.
     if (req.method !== 'GET' && req.method !== 'HEAD') {
-      req.pipe(proxyReq);
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        const body = Buffer.concat(chunks);
+        proxyReq.setHeader('content-length', body.length);
+        proxyReq.write(body);
+        proxyReq.end();
+      });
     } else {
       proxyReq.end();
     }

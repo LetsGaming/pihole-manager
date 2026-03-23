@@ -7,7 +7,9 @@
         <span class="ic-name">{{ instance.name }}</span>
       </div>
       <div class="ic-header-right">
-        <span class="badge" :class="blockingBadgeClass">{{ blockingLabel }}</span>
+        <span class="badge" :class="blockingBadgeClass">{{
+          blockingLabel
+        }}</span>
         <button
           class="btn btn-ghost btn-icon btn-sm"
           :disabled="loading"
@@ -28,7 +30,10 @@
 
     <!-- Loading skeleton -->
     <div v-else-if="loading && !summary" class="ic-skeleton">
-      <div class="skeleton" style="height: 18px; width: 55%; margin-bottom: 8px" />
+      <div
+        class="skeleton"
+        style="height: 18px; width: 55%; margin-bottom: 8px"
+      />
       <div class="skeleton" style="height: 18px; width: 38%" />
     </div>
 
@@ -53,13 +58,21 @@
         </div>
         <div class="ic-stat">
           <div class="ic-stat-label">Domains</div>
-          <div class="ic-stat-value">{{ fmt(summary.domains_being_blocked) }}</div>
+          <div class="ic-stat-value">
+            {{ fmt(summary.domains_being_blocked) }}
+          </div>
         </div>
       </div>
 
       <div class="ic-footer">
-        <span class="ic-url text-mono text-xs text-muted truncate">{{ instance.url }}</span>
-        <label class="toggle-wrap" style="cursor: pointer" :aria-label="`Toggle blocking for ${instance.name}`">
+        <span class="ic-url text-mono text-xs text-muted truncate">{{
+          instance.url
+        }}</span>
+        <label
+          class="toggle-wrap"
+          style="cursor: pointer"
+          :aria-label="`Toggle blocking for ${instance.name}`"
+        >
           <span class="text-xs text-muted">Blocking</span>
           <span class="toggle">
             <input
@@ -69,7 +82,7 @@
                 $emit(
                   'toggle-blocking',
                   instance.id,
-                  ($event.target as HTMLInputElement).checked,
+                  summary.status !== 'enabled',
                 )
               "
             />
@@ -98,9 +111,9 @@ export default defineComponent({
 
   props: {
     instance: { type: Object as PropType<PiholeInstance>, required: true },
-    summary:  { type: Object as PropType<PiholeSummary | null>, default: null },
-    loading:  { type: Boolean, default: false },
-    error:    { type: String as () => string | null, default: null },
+    summary: { type: Object as PropType<PiholeSummary | null>, default: null },
+    loading: { type: Boolean, default: false },
+    error: { type: String as () => string | null, default: null },
   },
 
   emits: ["refresh", "toggle-blocking"],
@@ -131,8 +144,8 @@ export default defineComponent({
   box-shadow: var(--shadow-sm);
   transition:
     border-color var(--duration-base) var(--ease-out),
-    box-shadow   var(--duration-base) var(--ease-out),
-    transform    var(--duration-base) var(--ease-out);
+    box-shadow var(--duration-base) var(--ease-out),
+    transform var(--duration-base) var(--ease-out);
 }
 .instance-card:hover {
   border-color: var(--border-dim);
@@ -145,9 +158,15 @@ export default defineComponent({
   display: block;
   height: 2px;
 }
-.instance-card.online::before  { background: var(--status-online); }
-.instance-card.offline::before { background: var(--status-offline); }
-.instance-card.offline { opacity: 0.7; }
+.instance-card.online::before {
+  background: var(--status-online);
+}
+.instance-card.offline::before {
+  background: var(--status-offline);
+}
+.instance-card.offline {
+  opacity: 0.7;
+}
 
 /* Header */
 .ic-header {
@@ -157,9 +176,21 @@ export default defineComponent({
   padding: 12px var(--space-4) 10px;
   border-bottom: 1px solid var(--border-subtle);
 }
-.ic-header-left { display: flex; align-items: center; gap: var(--space-2); }
-.ic-header-right { display: flex; align-items: center; gap: var(--space-2); }
-.ic-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.ic-header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ic-header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.ic-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+}
 
 /* Offline */
 .ic-offline {
@@ -172,7 +203,9 @@ export default defineComponent({
 }
 
 /* Skeleton */
-.ic-skeleton { padding: var(--space-4); }
+.ic-skeleton {
+  padding: var(--space-4);
+}
 
 /* Stats grid */
 .ic-stats {
@@ -184,8 +217,12 @@ export default defineComponent({
   border-right: 1px solid var(--border-subtle);
   border-bottom: 1px solid var(--border-subtle);
 }
-.ic-stat:nth-child(even)     { border-right: none; }
-.ic-stat:nth-last-child(-n+2) { border-bottom: none; }
+.ic-stat:nth-child(even) {
+  border-right: none;
+}
+.ic-stat:nth-last-child(-n + 2) {
+  border-bottom: none;
+}
 
 .ic-stat-label {
   font-size: 10px;
@@ -213,5 +250,7 @@ export default defineComponent({
   background: var(--bg-surface);
   border-top: 1px solid var(--border-subtle);
 }
-.ic-url { max-width: 160px; }
+.ic-url {
+  max-width: 160px;
+}
 </style>
