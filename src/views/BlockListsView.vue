@@ -16,7 +16,6 @@
           @select="selectInstance"
         />
 
-        <!-- List-type tabs -->
         <div class="list-type-tabs mb-3">
           <button
             v-for="tab in LIST_TABS"
@@ -32,7 +31,6 @@
           </button>
         </div>
 
-        <!-- ── Adlists panel ──────────────────────────────────────────────── -->
         <template v-if="activeTab === 'adlists'">
           <div class="card mb-3">
             <div class="card-header">
@@ -60,13 +58,17 @@
                 <ion-icon :icon="addOutline" /> Add
               </button>
             </div>
-            <div class="suggested-lists mt-3">
+
+            <div
+              v-if="filteredSuggestedLists.length"
+              class="suggested-lists mt-3"
+            >
               <div class="text-xs text-muted mb-2">
                 Quick add popular lists:
               </div>
               <div class="flex gap-2" style="flex-wrap: wrap">
                 <button
-                  v-for="l in SUGGESTED_LISTS"
+                  v-for="l in filteredSuggestedLists"
                   :key="l.url"
                   class="btn btn-ghost btn-sm"
                   @click="
@@ -105,7 +107,6 @@
               </div>
             </div>
 
-            <!-- Active sort pills for adlists -->
             <div v-if="adlistSortKey" class="sort-pills sort-pills--in-card">
               <span class="text-xs text-muted" style="line-height: 24px"
                 >Sort:</span
@@ -223,7 +224,6 @@
           </div>
         </template>
 
-        <!-- ── Domain list panels ─────────────────────────────────────────── -->
         <template v-else>
           <AddDomainForm
             :placeholder="domainPlaceholder"
@@ -282,7 +282,8 @@ const LIST_TABS = [
   { key: "regex_white", label: "Regex Allow" },
 ] as const;
 
-const SUGGESTED_LISTS = [
+// Static fallbacks
+const STATIC_SUGGESTED = [
   {
     name: "StevenBlack",
     url: "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts",
@@ -290,11 +291,6 @@ const SUGGESTED_LISTS = [
   {
     name: "Disconnect.me",
     url: "https://s3.amazonaws.com/lists.disconnect.me/simple_ad.txt",
-  },
-  { name: "abuse.ch", url: "https://urlhaus.abuse.ch/downloads/hostfile/" },
-  {
-    name: "NoTrack",
-    url: "https://gitlab.com/quidsup/notrack-blocklists/raw/master/notrack-blocklist.txt",
   },
 ];
 
@@ -341,9 +337,9 @@ export default defineComponent({
       newAdlistComment: "" as string,
       counts: {} as Record<string, number>,
       adlistSort: markRaw(useMultiSort()) as MultiSort,
+      dynamicSuggested: [] as Array<{ name: string; url: string }>,
       ADLIST_LABELS,
       LIST_TABS,
-      SUGGESTED_LISTS,
       copyToClipboard,
       shieldOutline,
       addOutline,
@@ -368,11 +364,24 @@ export default defineComponent({
     currentTabLabel(): string {
       return LIST_TABS.find((t) => t.key === this.activeTab)?.label ?? "";
     },
-
     domainPlaceholder(): string {
       return this.activeTab.includes("regex")
         ? "e.g. .*\\.ads\\..*"
         : "e.g. ads.example.com";
+    },
+
+    /**
+     * Filters out suggested lists that are already in the instance's adlists.
+     */
+    filteredSuggestedLists(): Array<{ name: string; url: string }> {
+      const existingUrls = new Set(
+        this.rawAdlists.map((a) => a.address.toLowerCase()),
+      );
+      const allSuggestions = [...STATIC_SUGGESTED, ...this.dynamicSuggested];
+
+      return allSuggestions.filter(
+        (s) => !existingUrls.has(s.url.toLowerCase()),
+      );
     },
   },
 
@@ -381,11 +390,50 @@ export default defineComponent({
       this.instanceStore.activeInstanceId ??
       this.instanceStore.instances[0]?.id ??
       null;
-    if (this.selectedInstanceId) void this.loadAdlists();
+
+    if (this.selectedInstanceId) {
+      void this.loadAdlists();
+    }
+    void this.fetchDynamicLists();
   },
 
   methods: {
-    // ── Adlist sort ───────────────────────────────────────────────────────────
+    /**
+     * Fetches popular lists using a CORS proxy to bypass browser restrictions
+     */
+    async fetchDynamicLists(): Promise<void> {
+      try {
+        // We use a CORS proxy because Firebog doesn't allow direct browser access
+        const targetUrl = "https://v.firebog.net/hosts/lists.php?type=nocross";
+        const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error("Network response was not ok");
+
+        const text = await response.text();
+        const urls = text
+          .split("\n")
+          .filter((url) => url.trim().startsWith("http"));
+
+        // Take a slice and format names for the UI
+        this.dynamicSuggested = urls.slice(0, 12).map((url) => {
+          // Extract a readable name from the URL
+          const parts = url
+            .replace("https://", "")
+            .replace("http://", "")
+            .split("/");
+          const name = parts[parts.length - 1] || parts[0];
+          return {
+            name: name.replace(".txt", "").replace(".hosts", ""),
+            url: url.trim(),
+          };
+        });
+      } catch (err) {
+        console.warn("Failed to fetch dynamic suggested lists via proxy", err);
+        // Fallback: The UI will just show STATIC_SUGGESTED via the computed property
+      }
+    },
+
     onAdlistSortChanged(): void {
       this.adlistSortKey = this.adlistSort.levels
         .map((l) => `${l.col}:${l.dir}`)
