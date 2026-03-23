@@ -23,7 +23,12 @@
         <main class="docs-main">
           <!-- Loading -->
           <div v-if="loading" class="docs-loading">
-            <div v-for="i in 6" :key="i" class="skeleton" :style="`height: ${i === 1 ? 32 : 18}px; width: ${[60,90,70,85,55,75][i-1]}%; margin-bottom: 12px`" />
+            <div
+              v-for="i in 6"
+              :key="i"
+              class="skeleton"
+              :style="`height: ${i === 1 ? 32 : 18}px; width: ${[60, 90, 70, 85, 55, 75][i - 1]}%; margin-bottom: 12px`"
+            />
           </div>
 
           <!-- Error -->
@@ -42,7 +47,10 @@
             >
               <!-- eslint-disable-next-line vue/no-v-html -->
               <div class="docs-content" v-html="section.html" />
-              <hr v-if="section.id !== sections[sections.length - 1].id" class="docs-divider" />
+              <hr
+                v-if="section.id !== sections[sections.length - 1].id"
+                class="docs-divider"
+              />
             </div>
           </template>
         </main>
@@ -89,7 +97,7 @@ function renderMarkdown(md: string): string {
         i++;
       }
       out.push(
-        `<pre${lang ? ` class="language-${lang}"` : ""}><code>${codeLines.join("\n")}</code></pre>`
+        `<pre${lang ? ` class="language-${lang}"` : ""}><code>${codeLines.join("\n")}</code></pre>`,
       );
       i++; // skip closing ```
       continue;
@@ -119,16 +127,34 @@ function renderMarkdown(md: string): string {
     }
 
     // ── Table ──────────────────────────────────────────────────────────────
-    if (line.includes("|") && i + 1 < lines.length && lines[i + 1].includes("|") && /^[\s|:-]+$/.test(lines[i + 1])) {
-      const headerCells = line.split("|").map(c => c.trim()).filter(Boolean);
+    if (
+      line.includes("|") &&
+      i + 1 < lines.length &&
+      lines[i + 1].includes("|") &&
+      /^[\s|:-]+$/.test(lines[i + 1])
+    ) {
+      const headerCells = line
+        .split("|")
+        .map((c) => c.trim())
+        .filter(Boolean);
       i += 2; // skip header + separator
       const rows: string[][] = [];
       while (i < lines.length && lines[i].includes("|")) {
-        rows.push(lines[i].split("|").map(c => c.trim()).filter(Boolean));
+        rows.push(
+          lines[i]
+            .split("|")
+            .map((c) => c.trim())
+            .filter(Boolean),
+        );
         i++;
       }
-      const thead = `<tr>${headerCells.map(c => `<th>${inlineRender(c)}</th>`).join("")}</tr>`;
-      const tbody = rows.map(r => `<tr>${r.map(c => `<td>${inlineRender(c)}</td>`).join("")}</tr>`).join("");
+      const thead = `<tr>${headerCells.map((c) => `<th>${inlineRender(c)}</th>`).join("")}</tr>`;
+      const tbody = rows
+        .map(
+          (r) =>
+            `<tr>${r.map((c) => `<td>${inlineRender(c)}</td>`).join("")}</tr>`,
+        )
+        .join("");
       out.push(`<table><thead>${thead}</thead><tbody>${tbody}</tbody></table>`);
       continue;
     }
@@ -148,7 +174,9 @@ function renderMarkdown(md: string): string {
     if (/^\d+\.\s/.test(line)) {
       const items: string[] = [];
       while (i < lines.length && /^\d+\.\s/.test(lines[i])) {
-        items.push(`<li>${inlineRender(lines[i].replace(/^\d+\.\s/, ""))}</li>`);
+        items.push(
+          `<li>${inlineRender(lines[i].replace(/^\d+\.\s/, ""))}</li>`,
+        );
         i++;
       }
       out.push(`<ol>${items.join("")}</ol>`);
@@ -185,41 +213,64 @@ function renderMarkdown(md: string): string {
 
 /** Render inline Markdown: bold, italic, inline code, links */
 function inlineRender(text: string): string {
-  return text
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    // Italic
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Inline code
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    // Markdown links [text](url) — keep as plain text for in-app docs
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return (
+    text
+      // Bold
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      // Italic
+      .replace(/\*(.+?)\*/g, "<em>$1</em>")
+      // Inline code
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      // Markdown links [text](url) — keep as plain text for in-app docs
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+  );
 }
 
 // ── Section manifest ────────────────────────────────────────────────────────
 // Each entry maps an id + title to a markdown file imported via Vite glob.
 // The order here controls sidebar order and page order.
 const DOC_SECTIONS: Array<{ id: string; title: string; file: string }> = [
-  { id: "getting-started",   title: "Getting Started",     file: "getting-started.md"   },
-  { id: "dashboard",         title: "Dashboard",           file: "dashboard.md"          },
-  { id: "query-log",         title: "Query Log",           file: "query-log.md"          },
-  { id: "block-lists",       title: "Block Lists",         file: "block-lists.md"        },
-  { id: "statistics",        title: "Statistics",          file: "statistics.md"         },
-  { id: "hardware",          title: "Hardware",            file: "hardware.md"           },
-  { id: "api-compatibility", title: "API Compatibility",   file: "api-compatibility.md"  },
-  { id: "cors-and-proxy",    title: "CORS & Dev Proxy",    file: "cors-and-proxy.md"     },
-  { id: "troubleshooting",   title: "Troubleshooting",     file: "troubleshooting.md"    },
-  { id: "architecture",      title: "Architecture",        file: "architecture.md"       },
+  {
+    id: "getting-started",
+    title: "Getting Started",
+    file: "getting-started.md",
+  },
+  { id: "dashboard", title: "Dashboard", file: "dashboard.md" },
+  { id: "query-log", title: "Query Log", file: "query-log.md" },
+  { id: "block-lists", title: "Block Lists", file: "block-lists.md" },
+  { id: "statistics", title: "Statistics", file: "statistics.md" },
+  { id: "hardware", title: "Hardware", file: "hardware.md" },
+  {
+    id: "api-compatibility",
+    title: "API Compatibility",
+    file: "api-compatibility.md",
+  },
+  {
+    id: "cors-and-proxy",
+    title: "CORS & Dev Proxy",
+    file: "cors-and-proxy.md",
+  },
+  {
+    id: "troubleshooting",
+    title: "Troubleshooting",
+    file: "troubleshooting.md",
+  },
+  { id: "architecture", title: "Architecture", file: "architecture.md" },
 ];
 
 // Vite's import.meta.glob with ?raw gives us the file content as a string.
 // The path must be a string literal — no dynamic concatenation.
-const rawFiles = import.meta.glob("../docs/*.md", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+const rawFiles = import.meta.glob("../docs/*.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
 
 function loadSection(file: string): string {
   const key = `../docs/${file}`;
   const raw = rawFiles[key];
-  if (!raw) return `<p class="text-muted">Documentation file <code>${file}</code> not found.</p>`;
+  if (!raw)
+    return `<p class="text-muted">Documentation file <code>${file}</code> not found.</p>`;
   return renderMarkdown(raw);
 }
 
@@ -246,7 +297,7 @@ export default defineComponent({
     buildSections(): void {
       this.loading = true;
       try {
-        this.sections = DOC_SECTIONS.map(s => ({
+        this.sections = DOC_SECTIONS.map((s) => ({
           id: s.id,
           title: s.title,
           html: loadSection(s.file),
@@ -292,7 +343,10 @@ export default defineComponent({
   text-decoration: none;
   border-radius: var(--radius-sm);
   border-left: 2px solid transparent;
-  transition: color var(--duration-fast), background var(--duration-fast), border-color var(--duration-fast);
+  transition:
+    color var(--duration-fast),
+    background var(--duration-fast),
+    border-color var(--duration-fast);
   margin-bottom: 1px;
   line-height: 1.4;
 }
@@ -322,7 +376,9 @@ export default defineComponent({
 }
 
 /* ── Loading / Error ── */
-.docs-loading { max-width: 600px; }
+.docs-loading {
+  max-width: 600px;
+}
 .docs-error {
   display: flex;
   align-items: center;

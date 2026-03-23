@@ -52,11 +52,11 @@ vi.mock("@/services/piholeApi", () => ({
 }));
 
 const STUBS = {
-  "ion-page":        { template: '<div class="ion-page"><slot /></div>' },
-  "ion-header":      { template: "<div><slot /></div>" },
-  "ion-toolbar":     { template: "<div><slot /></div>" },
-  "ion-content":     { template: '<div class="ion-content"><slot /></div>' },
-  "ion-buttons":     { template: "<div><slot /></div>" },
+  "ion-page": { template: '<div class="ion-page"><slot /></div>' },
+  "ion-header": { template: "<div><slot /></div>" },
+  "ion-toolbar": { template: "<div><slot /></div>" },
+  "ion-content": { template: '<div class="ion-content"><slot /></div>' },
+  "ion-buttons": { template: "<div><slot /></div>" },
   "ion-menu-button": { template: "<button />" },
   PageHeader: { template: '<div><slot name="actions" /></div>' },
   EmptyState: {
@@ -105,9 +105,16 @@ describe("StatisticsView — unified layout", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Pi A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Pi A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.find(".stats-overview-cards").exists()).toBe(true);
   });
@@ -116,9 +123,16 @@ describe("StatisticsView — unified layout", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Pi A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Pi A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.find(".stats-chart").exists()).toBe(true);
   });
@@ -127,9 +141,16 @@ describe("StatisticsView — unified layout", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Pi A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Pi A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     // Three TopDomainsCard: queried, blocked, clients
     expect(w.findAll(".top-domains-card").length).toBe(3);
@@ -142,10 +163,22 @@ describe("StatisticsView — instance selection", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.selectedInstanceId).toBe("__all__");
   });
@@ -154,9 +187,16 @@ describe("StatisticsView — instance selection", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Solo", url: "http://pi.hole", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Solo",
+      url: "http://pi.hole",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.selectedInstanceId).toBe(store.instances[0].id);
   });
@@ -165,9 +205,16 @@ describe("StatisticsView — instance selection", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Pi", url: "http://pi.hole", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Pi",
+      url: "http://pi.hole",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.html()).toContain("All Instances");
   });
@@ -176,10 +223,22 @@ describe("StatisticsView — instance selection", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Alpha", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "Beta",  url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Alpha",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "Beta",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.text()).toContain("Alpha");
     expect(w.text()).toContain("Beta");
@@ -192,10 +251,22 @@ describe("StatisticsView — isAllMode", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.isAllMode).toBe(true);
   });
@@ -204,9 +275,16 @@ describe("StatisticsView — isAllMode", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Solo", url: "http://pi.hole", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Solo",
+      url: "http://pi.hole",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.isAllMode).toBe(false);
   });
@@ -218,10 +296,22 @@ describe("StatisticsView — chartLabel", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.chartLabel).toBe("All Instances");
   });
@@ -230,9 +320,16 @@ describe("StatisticsView — chartLabel", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Home Pi", url: "http://pi.hole", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Home Pi",
+      url: "http://pi.hole",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.chartLabel).toBe("Home Pi");
   });
@@ -243,12 +340,38 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
   function makeStore(pinia: ReturnType<typeof createPinia>) {
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
     const [idA, idB] = store.instances.map((i) => i.id);
     store.summaryData = {
-      [idA]: { status: "enabled", dns_queries_today: 1000, ads_blocked_today: 100, ads_percentage_today: 10, domains_being_blocked: 50000, unique_clients: 3, queries_cached: 200 },
-      [idB]: { status: "enabled", dns_queries_today: 2000, ads_blocked_today: 400, ads_percentage_today: 20, domains_being_blocked: 70000, unique_clients: 5, queries_cached: 500 },
+      [idA]: {
+        status: "enabled",
+        dns_queries_today: 1000,
+        ads_blocked_today: 100,
+        ads_percentage_today: 10,
+        domains_being_blocked: 50000,
+        unique_clients: 3,
+        queries_cached: 200,
+      },
+      [idB]: {
+        status: "enabled",
+        dns_queries_today: 2000,
+        ads_blocked_today: 400,
+        ads_percentage_today: 20,
+        domains_being_blocked: 70000,
+        unique_clients: 5,
+        queries_cached: 500,
+      },
     };
     return store;
   }
@@ -256,7 +379,9 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
   it("sums dns_queries_today across instances", async () => {
     const pinia = createPinia();
     makeStore(pinia);
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.displaySummary?.dns_queries_today).toBe(3000);
   });
@@ -264,7 +389,9 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
   it("sums ads_blocked_today across instances", async () => {
     const pinia = createPinia();
     makeStore(pinia);
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.displaySummary?.ads_blocked_today).toBe(500);
   });
@@ -272,7 +399,9 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
   it("sums queries_cached across instances", async () => {
     const pinia = createPinia();
     makeStore(pinia);
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.displaySummary?.queries_cached).toBe(700);
   });
@@ -280,7 +409,9 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
   it("calculates block rate from combined totals", async () => {
     const pinia = createPinia();
     makeStore(pinia);
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     // 500 blocked / 3000 queries = 16.7%
     expect(w.vm.displaySummary?.ads_percentage_today).toBeCloseTo(16.7, 0);
@@ -290,10 +421,22 @@ describe("StatisticsView — displaySummary (aggregate)", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.displaySummary).toBeNull();
   });
@@ -305,12 +448,26 @@ describe("StatisticsView — displaySummary (single instance)", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "Solo", url: "http://pi.hole", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "Solo",
+      url: "http://pi.hole",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
     const id = store.instances[0].id;
-    const data = { status: "enabled" as const, dns_queries_today: 5000, ads_blocked_today: 750, ads_percentage_today: 15, domains_being_blocked: 120000, unique_clients: 8 };
+    const data = {
+      status: "enabled" as const,
+      dns_queries_today: 5000,
+      ads_blocked_today: 750,
+      ads_percentage_today: 15,
+      domains_being_blocked: 120000,
+      unique_clients: 8,
+    };
     store.summaryData = { [id]: data };
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     await w.vm.$nextTick();
     expect(w.vm.displaySummary).toEqual(data);
   });
@@ -333,17 +490,49 @@ describe("StatisticsView — merged top data (unique deduplication)", () => {
     const pinia = createPinia();
     setActivePinia(pinia);
     const store = useInstanceStore();
-    store.addInstance({ name: "A", url: "http://pi.a", apiToken: "t", apiVersion: "v5" });
-    store.addInstance({ name: "B", url: "http://pi.b", apiToken: "t", apiVersion: "v5" });
+    store.addInstance({
+      name: "A",
+      url: "http://pi.a",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
+    store.addInstance({
+      name: "B",
+      url: "http://pi.b",
+      apiToken: "t",
+      apiVersion: "v5",
+    });
     const [idA, idB] = store.instances.map((i) => i.id);
     store.summaryData = {
-      [idA]: { status: "enabled", dns_queries_today: 1000, ads_blocked_today: 100, ads_percentage_today: 10, domains_being_blocked: 50000, unique_clients: 3, queries_cached: 0 },
-      [idB]: { status: "enabled", dns_queries_today: 2000, ads_blocked_today: 200, ads_percentage_today: 10, domains_being_blocked: 60000, unique_clients: 4, queries_cached: 0 },
+      [idA]: {
+        status: "enabled",
+        dns_queries_today: 1000,
+        ads_blocked_today: 100,
+        ads_percentage_today: 10,
+        domains_being_blocked: 50000,
+        unique_clients: 3,
+        queries_cached: 0,
+      },
+      [idB]: {
+        status: "enabled",
+        dns_queries_today: 2000,
+        ads_blocked_today: 200,
+        ads_percentage_today: 10,
+        domains_being_blocked: 60000,
+        unique_clients: 4,
+        queries_cached: 0,
+      },
     };
 
-    const w = mount(StatisticsView, { global: { plugins: [pinia], stubs: STUBS } });
+    const w = mount(StatisticsView, {
+      global: { plugins: [pinia], stubs: STUBS },
+    });
     // Set merged topClients with unique entries
-    w.vm.topClients = { "192.168.1.1": 500, "192.168.1.2": 300, "192.168.1.3": 200 };
+    w.vm.topClients = {
+      "192.168.1.1": 500,
+      "192.168.1.2": 300,
+      "192.168.1.3": 200,
+    };
     await w.vm.$nextTick();
 
     // unique_clients in displaySummary should reflect merged top clients count

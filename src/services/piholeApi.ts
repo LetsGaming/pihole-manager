@@ -241,7 +241,8 @@ const PiholeApiService = {
         ]);
         const d = summaryRes.data;
         return {
-          status: blockingRes.data.blocking === "enabled" ? "enabled" : "disabled",
+          status:
+            blockingRes.data.blocking === "enabled" ? "enabled" : "disabled",
           dns_queries_today: d.queries.total,
           ads_blocked_today: d.queries.blocked,
           ads_percentage_today: d.queries.percent_blocked,
@@ -263,7 +264,9 @@ const PiholeApiService = {
     const client = v5Client(instance);
     const [summaryRes, statusRes] = await Promise.all([
       client.get<PiholeSummary>("/admin/api.php", { params: { summary: "" } }),
-      client.get<{ status: BlockingStatus }>("/admin/api.php", { params: { status: "" } }),
+      client.get<{ status: BlockingStatus }>("/admin/api.php", {
+        params: { status: "" },
+      }),
     ]);
     return { ...summaryRes.data, status: statusRes.data.status };
   },
@@ -292,10 +295,9 @@ const PiholeApiService = {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
         // POST returns { blocking: "enabled"|"disabled", timer: null }
-        const { data } = await client.post<{ blocking: "enabled" | "disabled" }>(
-          "/api/dns/blocking",
-          { blocking: true },
-        );
+        const { data } = await client.post<{
+          blocking: "enabled" | "disabled";
+        }>("/api/dns/blocking", { blocking: true });
         return { status: data.blocking === "enabled" ? "enabled" : "disabled" };
       });
     }
@@ -315,10 +317,9 @@ const PiholeApiService = {
         const body: Record<string, unknown> = { blocking: false };
         if (seconds > 0) body.timer = seconds;
         // POST returns { blocking: "enabled"|"disabled", timer: null }
-        const { data } = await client.post<{ blocking: "enabled" | "disabled" }>(
-          "/api/dns/blocking",
-          body,
-        );
+        const { data } = await client.post<{
+          blocking: "enabled" | "disabled";
+        }>("/api/dns/blocking", body);
         return { status: data.blocking === "enabled" ? "enabled" : "disabled" };
       });
     }
@@ -586,7 +587,9 @@ const PiholeApiService = {
         // instead. Filter client-side as a safety net in case the endpoint
         // returns mixed results (e.g. regex entries alongside exact ones).
         return (data.domains ?? [])
-          .filter((d) => (!d.type || d.type === type) && (!d.kind || d.kind === kind))
+          .filter(
+            (d) => (!d.type || d.type === type) && (!d.kind || d.kind === kind),
+          )
           .map((d) => ({
             id: d.id,
             domain: d.domain,

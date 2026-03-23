@@ -16,13 +16,11 @@ import { useNotificationStore } from "@/stores/notificationStore";
 vi.mock("@/services/piholeApi", () => ({
   default: {
     getSummary: vi.fn().mockResolvedValue({ status: "enabled" }),
-    testConnection: vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        message: "Connection successful",
-        latencyMs: 12,
-      }),
+    testConnection: vi.fn().mockResolvedValue({
+      ok: true,
+      message: "Connection successful",
+      latencyMs: 12,
+    }),
     errorMessage: (e: unknown) => (e as Error)?.message ?? "Error",
   },
 }));

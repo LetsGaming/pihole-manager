@@ -373,18 +373,16 @@ describe("PiholeApiService v6 authentication", () => {
   it("v5 sets auth param on every request", async () => {
     let capturedParams: Record<string, unknown> | null = null;
     vi.mocked(axios.create).mockReturnValue({
-      get: vi
-        .fn()
-        .mockResolvedValue({
-          data: {
-            status: "enabled",
-            dns_queries_today: 0,
-            ads_blocked_today: 0,
-            ads_percentage_today: 0,
-            domains_being_blocked: 0,
-            unique_clients: 0,
-          },
-        }),
+      get: vi.fn().mockResolvedValue({
+        data: {
+          status: "enabled",
+          dns_queries_today: 0,
+          ads_blocked_today: 0,
+          ads_percentage_today: 0,
+          domains_being_blocked: 0,
+          unique_clients: 0,
+        },
+      }),
       interceptors: {
         request: {
           use: vi.fn(

@@ -13,10 +13,10 @@ import type { PiholeSummary } from "@/types/api";
 
 vi.mock("@/services/piholeApi", () => ({
   default: {
-    getSummary:       vi.fn(),
-    enableBlocking:   vi.fn(),
-    disableBlocking:  vi.fn(),
-    testConnection:   vi.fn(),
+    getSummary: vi.fn(),
+    enableBlocking: vi.fn(),
+    disableBlocking: vi.fn(),
+    testConnection: vi.fn(),
     errorMessage: (err: unknown) => (err as Error)?.message ?? "Unknown error",
   },
 }));
@@ -45,8 +45,12 @@ function cfg(overrides: Partial<NewInstanceConfig> = {}): NewInstanceConfig {
 beforeEach(() => {
   setActivePinia(createPinia());
   vi.mocked(PiholeApiService.getSummary).mockResolvedValue(VALID_SUMMARY);
-  vi.mocked(PiholeApiService.enableBlocking).mockResolvedValue({ status: "enabled" });
-  vi.mocked(PiholeApiService.disableBlocking).mockResolvedValue({ status: "disabled" });
+  vi.mocked(PiholeApiService.enableBlocking).mockResolvedValue({
+    status: "enabled",
+  });
+  vi.mocked(PiholeApiService.disableBlocking).mockResolvedValue({
+    status: "disabled",
+  });
   vi.useFakeTimers();
 });
 
@@ -237,24 +241,30 @@ describe("instanceStore.refreshInstance", () => {
     const id = store.instances[0].id;
     await store.refreshInstance(id);
 
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
+      new Error("refused"),
+    );
     await store.refreshInstance(id);
     expect(store.instances[0].status).not.toBe("offline");
     expect(store.errors[id]).toBeTruthy();
   });
 
   it("sets status to offline after OFFLINE_THRESHOLD consecutive failures", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
+      new Error("refused"),
+    );
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
     await store.refreshInstance(id);
-    await store.refreshInstance(id); 
+    await store.refreshInstance(id);
     expect(store.instances[0].status).toBe("offline");
   });
 
   it("resets fail counter and goes back online after recovery", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("refused"));
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
+      new Error("refused"),
+    );
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
@@ -269,7 +279,9 @@ describe("instanceStore.refreshInstance", () => {
   });
 
   it("stores error message on failure", async () => {
-    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(new Error("Timeout"));
+    vi.mocked(PiholeApiService.getSummary).mockRejectedValue(
+      new Error("Timeout"),
+    );
     const store = useInstanceStore();
     store.addInstance(cfg());
     const id = store.instances[0].id;
@@ -304,7 +316,9 @@ describe("instanceStore.enableBlocking", () => {
 
   it("throws for unknown instance", async () => {
     const store = useInstanceStore();
-    await expect(store.enableBlocking("bad-id")).rejects.toThrow("Instance not found");
+    await expect(store.enableBlocking("bad-id")).rejects.toThrow(
+      "Instance not found",
+    );
   });
 });
 
@@ -417,7 +431,7 @@ describe("instanceStore persistence", () => {
       activeInstanceId: "ph_abc",
     };
     localStorage.setItem("orbital_instances", JSON.stringify(mockStorage));
-    
+
     const store = useInstanceStore();
     store.loadFromStorage();
     expect(store.instances).toHaveLength(1);
@@ -429,7 +443,17 @@ describe("instanceStore persistence", () => {
     localStorage.setItem(
       "orbital_instances",
       JSON.stringify({
-        instances: [{ id: "ph_abc", name: "R", url: "http://pi.hole", apiToken: "t", apiVersion: "v5", status: "unknown", addedAt: "" }],
+        instances: [
+          {
+            id: "ph_abc",
+            name: "R",
+            url: "http://pi.hole",
+            apiToken: "t",
+            apiVersion: "v5",
+            status: "unknown",
+            addedAt: "",
+          },
+        ],
         activeInstanceId: "ph_abc",
       }),
     );
@@ -444,7 +468,17 @@ describe("instanceStore persistence", () => {
     localStorage.setItem(
       "orbital_instances",
       JSON.stringify({
-        instances: [{ id: "ph_xyz", name: "Only", url: "http://pi.hole", apiToken: "t", apiVersion: "v5", status: "unknown", addedAt: "" }],
+        instances: [
+          {
+            id: "ph_xyz",
+            name: "Only",
+            url: "http://pi.hole",
+            apiToken: "t",
+            apiVersion: "v5",
+            status: "unknown",
+            addedAt: "",
+          },
+        ],
         activeInstanceId: "ph_gone",
       }),
     );
@@ -468,11 +502,11 @@ describe("instanceStore polling", () => {
     store.addInstance(cfg());
     await store.refreshAll();
     vi.mocked(PiholeApiService.getSummary).mockClear();
-    
+
     store.startPolling();
     vi.advanceTimersByTime(2500);
     await Promise.resolve();
-    
+
     expect(vi.mocked(PiholeApiService.getSummary)).toHaveBeenCalled();
     store.stopPolling();
   });

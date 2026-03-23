@@ -38,7 +38,9 @@ export interface MultiSort {
    */
   apply<T>(
     rows: T[],
-    accessors?: Partial<Record<string, (row: T) => string | number | boolean | null | undefined>>,
+    accessors?: Partial<
+      Record<string, (row: T) => string | number | boolean | null | undefined>
+    >,
   ): T[];
 }
 
@@ -77,7 +79,9 @@ export function useMultiSort(): MultiSort {
 
     apply<T>(
       rows: T[],
-      accessors: Partial<Record<string, (row: T) => string | number | boolean | null | undefined>> = {},
+      accessors: Partial<
+        Record<string, (row: T) => string | number | boolean | null | undefined>
+      > = {},
     ): T[] {
       if (!sort.levels.length) return rows;
       return [...rows].sort((a, b) => {
@@ -89,8 +93,13 @@ export function useMultiSort(): MultiSort {
           if (av == null && bv == null) cmp = 0;
           else if (av == null) cmp = 1;
           else if (bv == null) cmp = -1;
-          else if (typeof av === "number" && typeof bv === "number") cmp = av - bv;
-          else cmp = String(av).localeCompare(String(bv), undefined, { numeric: true, sensitivity: "base" });
+          else if (typeof av === "number" && typeof bv === "number")
+            cmp = av - bv;
+          else
+            cmp = String(av).localeCompare(String(bv), undefined, {
+              numeric: true,
+              sensitivity: "base",
+            });
           if (cmp !== 0) return dir === "asc" ? cmp : -cmp;
         }
         return 0;

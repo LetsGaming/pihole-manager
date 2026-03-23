@@ -1,7 +1,7 @@
 <template>
   <ion-app :data-theme="theme">
     <ion-split-pane content-id="main-content" when="lg">
-      <ion-menu content-id="main-content" type="overlay">
+      <ion-menu content-id="main-content" type="overlay" style="max-width: 20% !important;">
         <ion-header>
           <ion-toolbar>
             <div class="sidebar-brand">

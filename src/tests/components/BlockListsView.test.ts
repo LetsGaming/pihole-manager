@@ -11,16 +11,14 @@ import { useInstanceStore } from "@/stores/instanceStore";
 // vi.mock is hoisted — all mock data MUST be inlined here, not referencing outer consts
 vi.mock("@/services/piholeApi", () => ({
   default: {
-    getSummary: vi
-      .fn()
-      .mockResolvedValue({
-        status: "enabled",
-        dns_queries_today: 0,
-        ads_blocked_today: 0,
-        ads_percentage_today: 0,
-        domains_being_blocked: 0,
-        unique_clients: 0,
-      }),
+    getSummary: vi.fn().mockResolvedValue({
+      status: "enabled",
+      dns_queries_today: 0,
+      ads_blocked_today: 0,
+      ads_percentage_today: 0,
+      domains_being_blocked: 0,
+      unique_clients: 0,
+    }),
     getAdlists: vi.fn().mockResolvedValue([
       {
         id: 1,

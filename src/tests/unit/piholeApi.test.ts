@@ -50,11 +50,9 @@ describe("PiholeApiService.getSummary", () => {
   });
 
   it("works for v6 instance — session auth + actual response shape", async () => {
-    const mockPost = vi
-      .fn()
-      .mockResolvedValue({
-        data: { session: { sid: "sid-abc", valid: true } },
-      });
+    const mockPost = vi.fn().mockResolvedValue({
+      data: { session: { sid: "sid-abc", valid: true } },
+    });
     const mockGet = vi.fn().mockImplementation((url: string) => {
       if (url === "/api/stats/summary") {
         return Promise.resolve({

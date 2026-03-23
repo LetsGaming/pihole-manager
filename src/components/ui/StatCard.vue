@@ -1,5 +1,10 @@
 <template>
-  <div class="stat-card" :class="accent" :aria-label="`${label}: ${value}`" role="group">
+  <div
+    class="stat-card"
+    :class="accent"
+    :aria-label="`${label}: ${value}`"
+    role="group"
+  >
     <div class="stat-card-inner">
       <div v-if="icon" class="stat-card-icon" aria-hidden="true">
         <ion-icon :icon="icon" />
@@ -22,11 +27,14 @@ export default defineComponent({
   name: "StatCard",
   components: { IonIcon },
   props: {
-    label:  { type: String, required: true },
-    value:  { type: String, required: true },
+    label: { type: String, required: true },
+    value: { type: String, required: true },
     accent: { type: String as PropType<string | null>, default: null },
-    sub:    { type: String as PropType<string | null>, default: null },
-    icon:   { type: [Object, String] as PropType<object | string | null>, default: null },
+    sub: { type: String as PropType<string | null>, default: null },
+    icon: {
+      type: [Object, String] as PropType<object | string | null>,
+      default: null,
+    },
   },
 });
 </script>

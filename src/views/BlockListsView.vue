@@ -91,8 +91,13 @@
                   :disabled="isGravityLoading"
                   @click="triggerGravityUpdate"
                 >
-                  <ion-icon :icon="isGravityLoading ? syncOutline : cloudDownloadOutline" :class="{ 'spin': isGravityLoading }" />
-                  {{ isGravityLoading ? 'Updating...' : 'Update Gravity' }}
+                  <ion-icon
+                    :icon="
+                      isGravityLoading ? syncOutline : cloudDownloadOutline
+                    "
+                    :class="{ spin: isGravityLoading }"
+                  />
+                  {{ isGravityLoading ? "Updating..." : "Update Gravity" }}
                 </button>
                 <button class="btn btn-ghost btn-sm" @click="loadAdlists">
                   <ion-icon :icon="refreshOutline" />
@@ -522,7 +527,9 @@ export default defineComponent({
       this.isGravityLoading = true;
       try {
         await PiholeApiService.updateGravity(this.currentInstance);
-        useNotificationStore().success("Gravity update triggered — running in background");
+        useNotificationStore().success(
+          "Gravity update triggered — running in background",
+        );
       } catch (err) {
         useNotificationStore().error(`Failed: ${(err as Error).message}`);
       } finally {
@@ -579,8 +586,12 @@ export default defineComponent({
   border-top: 1px solid var(--border-subtle);
 }
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 .spin {
   display: inline-block;

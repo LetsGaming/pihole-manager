@@ -16,16 +16,14 @@ import { useNotificationStore } from "@/stores/notificationStore";
 
 vi.mock("@/services/piholeApi", () => ({
   default: {
-    getSummary: vi
-      .fn()
-      .mockResolvedValue({
-        status: "enabled",
-        dns_queries_today: 1000,
-        ads_blocked_today: 100,
-        ads_percentage_today: 10,
-        domains_being_blocked: 90000,
-        unique_clients: 3,
-      }),
+    getSummary: vi.fn().mockResolvedValue({
+      status: "enabled",
+      dns_queries_today: 1000,
+      ads_blocked_today: 100,
+      ads_percentage_today: 10,
+      domains_being_blocked: 90000,
+      unique_clients: 3,
+    }),
     enableBlocking: vi.fn().mockResolvedValue({ status: "enabled" }),
     disableBlocking: vi.fn().mockResolvedValue({ status: "disabled" }),
     errorMessage: (e: unknown) => (e as Error)?.message ?? "Error",

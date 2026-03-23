@@ -29,9 +29,30 @@ vi.mock("@/services/piholeApi", () => ({
       unique_clients: 0,
     }),
     getQueryLog: vi.fn().mockResolvedValue([
-      { timestamp: 1700000000000, type: "A",    domain: "example.com",   client: "192.168.1.10", statusCode: 2, status: "allowed" },
-      { timestamp: 1700000001000, type: "A",    domain: "ads.tracker.io", client: "192.168.1.11", statusCode: 1, status: "blocked" },
-      { timestamp: 1700000002000, type: "AAAA", domain: "safe.org",       client: "192.168.1.12", statusCode: 3, status: "cached"  },
+      {
+        timestamp: 1700000000000,
+        type: "A",
+        domain: "example.com",
+        client: "192.168.1.10",
+        statusCode: 2,
+        status: "allowed",
+      },
+      {
+        timestamp: 1700000001000,
+        type: "A",
+        domain: "ads.tracker.io",
+        client: "192.168.1.11",
+        statusCode: 1,
+        status: "blocked",
+      },
+      {
+        timestamp: 1700000002000,
+        type: "AAAA",
+        domain: "safe.org",
+        client: "192.168.1.12",
+        statusCode: 3,
+        status: "cached",
+      },
     ]),
     addToList: vi.fn().mockResolvedValue({ success: true }),
     errorMessage: (e: unknown) => (e as Error)?.message ?? "Error",
@@ -43,14 +64,14 @@ vi.mock("date-fns", () => ({
 }));
 
 const STUBS = {
-  "ion-page":        { template: '<div class="ion-page"><slot /></div>' },
-  "ion-header":      { template: "<div><slot /></div>" },
-  "ion-toolbar":     { template: "<div><slot /></div>" },
-  "ion-content":     { template: '<div class="ion-content"><slot /></div>' },
-  "ion-buttons":     { template: "<div><slot /></div>" },
+  "ion-page": { template: '<div class="ion-page"><slot /></div>' },
+  "ion-header": { template: "<div><slot /></div>" },
+  "ion-toolbar": { template: "<div><slot /></div>" },
+  "ion-content": { template: '<div class="ion-content"><slot /></div>' },
+  "ion-buttons": { template: "<div><slot /></div>" },
   "ion-menu-button": { template: "<button />" },
-  "ion-icon":        { template: "<span />" },
-  PageHeader:        { template: "<div />" },
+  "ion-icon": { template: "<span />" },
+  PageHeader: { template: "<div />" },
   SortableHeader: {
     template: "<div />",
     props: ["col", "label", "sort", "sortKey", "tag"],
@@ -62,8 +83,23 @@ const STUBS = {
   },
   QueryLogToolbar: {
     template: '<div class="log-toolbar" />',
-    props: ["instances", "instanceId", "statusFilter", "searchQuery", "fetchCount", "isLive", "entryCount"],
-    emits: ["update:instanceId", "update:statusFilter", "update:searchQuery", "update:fetchCount", "toggle-live", "clear"],
+    props: [
+      "instances",
+      "instanceId",
+      "statusFilter",
+      "searchQuery",
+      "fetchCount",
+      "isLive",
+      "entryCount",
+    ],
+    emits: [
+      "update:instanceId",
+      "update:statusFilter",
+      "update:searchQuery",
+      "update:fetchCount",
+      "toggle-live",
+      "clear",
+    ],
   },
   QueryLogRow: {
     template: '<div class="log-row" />',
@@ -81,7 +117,10 @@ function createWrapper() {
 import type { EnrichedQueryEntry } from "@/types/api";
 
 /** Build a minimal EnrichedQueryEntry for test data. */
-function makeEntry(i: number, status: "allowed" | "blocked" | "cached" = "allowed"): EnrichedQueryEntry {
+function makeEntry(
+  i: number,
+  status: "allowed" | "blocked" | "cached" = "allowed",
+): EnrichedQueryEntry {
   return {
     timestamp: 1700000000000 + i,
     type: "A",
@@ -111,7 +150,12 @@ describe("QueryLogView", () => {
   it("fetchLog populates rawEntries and totalFiltered", async () => {
     const w = createWrapper();
     const store = useInstanceStore();
-    store.addInstance({ name: "Test", url: "http://pi.hole", apiToken: "tok", apiVersion: "v5" });
+    store.addInstance({
+      name: "Test",
+      url: "http://pi.hole",
+      apiToken: "tok",
+      apiVersion: "v5",
+    });
     store.instances[0].status = "online";
     await w.vm.fetchLog();
     // rawEntries holds the raw data (markRaw array)
@@ -124,53 +168,81 @@ describe("QueryLogView", () => {
   it("statusFilter=blocked shows only blocked entries in pagedEntries", async () => {
     const w = createWrapper();
     const store = useInstanceStore();
-    store.addInstance({ name: "Test", url: "http://pi.hole", apiToken: "tok", apiVersion: "v5" });
+    store.addInstance({
+      name: "Test",
+      url: "http://pi.hole",
+      apiToken: "tok",
+      apiVersion: "v5",
+    });
     store.instances[0].status = "online";
     await w.vm.fetchLog();
     w.vm.statusFilter = "blocked";
     // Watch fires synchronously in tests after assignment since it's a setter
     await w.vm.$nextTick();
     expect(
-      (w.vm.pagedEntries as EnrichedQueryEntry[]).every((e) => e.status === "blocked"),
+      (w.vm.pagedEntries as EnrichedQueryEntry[]).every(
+        (e) => e.status === "blocked",
+      ),
     ).toBe(true);
   });
 
   it("statusFilter=allowed shows only allowed entries in pagedEntries", async () => {
     const w = createWrapper();
     const store = useInstanceStore();
-    store.addInstance({ name: "Test", url: "http://pi.hole", apiToken: "tok", apiVersion: "v5" });
+    store.addInstance({
+      name: "Test",
+      url: "http://pi.hole",
+      apiToken: "tok",
+      apiVersion: "v5",
+    });
     store.instances[0].status = "online";
     await w.vm.fetchLog();
     w.vm.statusFilter = "allowed";
     await w.vm.$nextTick();
     expect(
-      (w.vm.pagedEntries as EnrichedQueryEntry[]).every((e) => e.status === "allowed"),
+      (w.vm.pagedEntries as EnrichedQueryEntry[]).every(
+        (e) => e.status === "allowed",
+      ),
     ).toBe(true);
   });
 
   it("searchQuery filters by domain in pagedEntries", async () => {
     const w = createWrapper();
     const store = useInstanceStore();
-    store.addInstance({ name: "Test", url: "http://pi.hole", apiToken: "tok", apiVersion: "v5" });
+    store.addInstance({
+      name: "Test",
+      url: "http://pi.hole",
+      apiToken: "tok",
+      apiVersion: "v5",
+    });
     store.instances[0].status = "online";
     await w.vm.fetchLog();
     w.vm.searchQuery = "example";
     await w.vm.$nextTick();
     expect(
-      (w.vm.pagedEntries as EnrichedQueryEntry[]).every((e) => e.domain.includes("example")),
+      (w.vm.pagedEntries as EnrichedQueryEntry[]).every((e) =>
+        e.domain.includes("example"),
+      ),
     ).toBe(true);
   });
 
   it("searchQuery filters by client in pagedEntries", async () => {
     const w = createWrapper();
     const store = useInstanceStore();
-    store.addInstance({ name: "Test", url: "http://pi.hole", apiToken: "tok", apiVersion: "v5" });
+    store.addInstance({
+      name: "Test",
+      url: "http://pi.hole",
+      apiToken: "tok",
+      apiVersion: "v5",
+    });
     store.instances[0].status = "online";
     await w.vm.fetchLog();
     w.vm.searchQuery = "192.168.1.10";
     await w.vm.$nextTick();
     expect(
-      (w.vm.pagedEntries as EnrichedQueryEntry[]).some((e) => e.client === "192.168.1.10"),
+      (w.vm.pagedEntries as EnrichedQueryEntry[]).some(
+        (e) => e.client === "192.168.1.10",
+      ),
     ).toBe(true);
   });
 
@@ -183,7 +255,9 @@ describe("QueryLogView", () => {
   it("pagedEntries slices at PAGE_SIZE (50)", () => {
     const w = createWrapper();
     // Inject 60 raw entries and trigger a rebuild
-    w.vm.rawEntries = markRaw(Array.from({ length: 60 }, (_, i) => makeEntry(i)));
+    w.vm.rawEntries = markRaw(
+      Array.from({ length: 60 }, (_, i) => makeEntry(i)),
+    );
     w.vm.rebuildView();
     expect((w.vm.pagedEntries as EnrichedQueryEntry[]).length).toBe(50);
     w.vm.page = 2;
@@ -215,6 +289,8 @@ describe("QueryLogView", () => {
   it("copyToClipboard calls navigator.clipboard", async () => {
     const w = createWrapper();
     await w.vm.copyToClipboard("test.domain.com");
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test.domain.com");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      "test.domain.com",
+    );
   });
 });

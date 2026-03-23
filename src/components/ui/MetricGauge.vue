@@ -40,7 +40,9 @@ export default defineComponent({
   padding: var(--space-4);
   border-right: 1px solid var(--border-subtle);
 }
-.hw-metric-card:last-child { border-right: none; }
+.hw-metric-card:last-child {
+  border-right: none;
+}
 .hw-metric-label {
   font-family: var(--font-mono);
   font-size: 10px;

@@ -55,7 +55,9 @@
         </div>
 
         <!-- Aggregate stats — reuses StatsOverviewCards for consistent design -->
-        <div class="section-label stats-overview-label">AGGREGATE — ALL INSTANCES</div>
+        <div class="section-label stats-overview-label">
+          AGGREGATE — ALL INSTANCES
+        </div>
         <StatsOverviewCards :summary="aggregateSummary" aggregate-mode>
           <template #extra-cards>
             <StatCard
