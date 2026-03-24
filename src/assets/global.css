@@ -259,6 +259,10 @@ ion-toolbar {
   --border-color: var(--border-subtle);
 }
 
+.buttons-last-slot {
+  padding-right: 1em;
+}
+
 .section-label {
   font-family: var(--font-mono);
   font-size: 10px;
