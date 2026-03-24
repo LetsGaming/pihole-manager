@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
     meta: { title: "Statistics" },
   },
   {
+    path: "/sync",
+    name: "Sync",
+    component: () => import("@/views/SyncView.vue"),
+    meta: { title: "Sync Instances" },
+  },
+  {
     path: "/settings",
     name: "Settings",
     component: () => import("@/views/SettingsView.vue"),

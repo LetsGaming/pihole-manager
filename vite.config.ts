@@ -28,6 +28,21 @@ function decodeTarget(b64: string): URL | null {
   }
 }
 
+// Headers that must never be forwarded by a proxy in either direction.
+// Forwarding these — especially transfer-encoding — causes Pi-hole's HTTP
+// parser to emit "Expected HTTP/, RTSP/ or ICE/" because the framing
+// information is connection-scoped, not end-to-end.
+const HOP_BY_HOP = new Set([
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'upgrade',
+]);
+
 function piholeProxyMiddleware(): Connect.NextHandleFunction {
   return (req, res, next) => {
     if (!req.url?.startsWith('/pihole-proxy/')) return next();
@@ -60,19 +75,41 @@ function piholeProxyMiddleware(): Connect.NextHandleFunction {
       return;
     }
 
+    // Strip hop-by-hop headers from the incoming request before forwarding.
+    const reqHeaders: Record<string, string | string[] | undefined> = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      if (!HOP_BY_HOP.has(k.toLowerCase())) reqHeaders[k] = v;
+    }
+    reqHeaders['host'] = target.host;
+
+    // Disable keep-alive on the upstream agent so every proxied request gets a
+    // fresh TCP connection.  This is critical for SSE endpoints like
+    // /api/action/gravity: Pi-hole streams progress as text/event-stream, then
+    // closes the connection.  With keep-alive enabled, Node's http.Agent returns
+    // that socket to the pool with leftover parser state — the *next* request
+    // that reuses it sees the dangling SSE bytes instead of "HTTP/1.1 200 OK"
+    // and throws "Parse Error: Expected HTTP/, RTSP/ or ICE/".
+    const agent = new (isHttps ? https.Agent : http.Agent)({ keepAlive: false });
+
     const proxyReq = transport.request(
       {
         hostname: target.hostname,
         port,
         path:     rest,
         method:   req.method,
-        headers:  { ...req.headers, host: target.host },
+        headers:  reqHeaders,
+        agent,
       },
       (proxyRes) => {
         const outHeaders: Record<string, string | string[]> = {};
-        // Forward all upstream headers except ones we're overriding
+        // Forward upstream response headers, but strip hop-by-hop ones.
+        // Forwarding transfer-encoding: chunked while Node is already writing
+        // a chunked response body causes the browser to see double-wrapped
+        // chunks and fail to parse the stream.
         for (const [k, v] of Object.entries(proxyRes.headers)) {
-          if (v !== undefined) outHeaders[k] = v;
+          if (v !== undefined && !HOP_BY_HOP.has(k.toLowerCase())) {
+            outHeaders[k] = v;
+          }
         }
         // Inject CORS so the browser accepts the response
         outHeaders['access-control-allow-origin']      = req.headers.origin ?? '*';
@@ -102,7 +139,7 @@ function piholeProxyMiddleware(): Connect.NextHandleFunction {
       req.on('end', () => {
         const body = Buffer.concat(chunks);
         proxyReq.setHeader('content-length', body.length);
-        proxyReq.write(body);
+        if (body.length > 0) proxyReq.write(body);
         proxyReq.end();
       });
     } else {

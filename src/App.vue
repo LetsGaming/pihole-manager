@@ -156,6 +156,7 @@ import {
   settingsOutline,
   bookOutline,
   statsChartOutline,
+  syncOutline,
 } from "ionicons/icons";
 import { useRoute } from "vue-router";
 import { mapStores } from "pinia";
@@ -192,6 +193,7 @@ export default defineComponent({
         { path: "/statistics", label: "Statistics", icon: statsChartOutline },
         { path: "/query-log", label: "Query Log", icon: listOutline },
         { path: "/blocklists", label: "Block Lists", icon: shieldOutline },
+        { path: "/sync", label: "Sync", icon: syncOutline },
         { path: "/hardware", label: "Hardware", icon: hardwareChipOutline },
         { path: "/settings", label: "Settings", icon: settingsOutline },
         { path: "/docs", label: "Documentation", icon: bookOutline },

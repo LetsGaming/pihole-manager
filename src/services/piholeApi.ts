@@ -656,7 +656,16 @@ const PiholeApiService = {
   async updateGravity(instance: PiholeInstance): Promise<void> {
     if (instance.apiVersion === "v6") {
       return v6Call(instance, async (client) => {
-        await client.post("/api/action/gravity");
+        // Pi-hole v6 streams gravity progress as text/event-stream (SSE).
+        // Using responseType:'text' + decompress:false prevents Axios from
+        // stalling while waiting for a JSON body that never arrives, and
+        // avoids decompression errors on the chunked SSE stream.
+        await client.post("/api/action/gravity", null, {
+          responseType: "text",
+          decompress: false,
+          // Give gravity enough time to finish on slow hardware (Pi Zero etc.)
+          timeout: 120_000,
+        });
       });
     }
     await v5Client(instance).get("/admin/api.php", {
