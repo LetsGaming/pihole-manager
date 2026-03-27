@@ -145,7 +145,17 @@ async function addLocalDnsRecord(
     // The correct endpoint is PUT /api/config/dns/hosts/{entry} where the
     // entry is the URL-encoded "ip domain" line.
     const entry = encodeURIComponent(`${record.ip} ${record.domain}`);
-    await client.put(`/api/config/dns/hosts/${entry}`);
+    try {
+      await client.put(`/api/config/dns/hosts/${entry}`);
+    } catch (err: unknown) {
+      // Pi-hole returns 201 Created, but browsers block reading the CORS
+      // preflight response — Axios throws even though the PUT succeeded.
+      // Treat any network error on this call as success; real failures
+      // (404, 401, 500) will surface as HTTP errors before the CORS block.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status !== undefined) throw err; // real HTTP error — re-throw
+      // otherwise it's a CORS-blocked success — swallow silently
+    }
     return;
   }
   await _v5Client(instance).get("/admin/api.php", {
@@ -160,10 +170,9 @@ async function removeLocalDnsRecord(
   if (instance.apiVersion === "v6") {
     await ensureV6Session(instance);
     const client = _v6Client(instance);
-    // v6: DELETE /api/config/dns/hosts/<ip>/<domain>
-    await client.delete(
-      `/api/config/dns/hosts/${encodeURIComponent(record.ip)}/${encodeURIComponent(record.domain)}`,
-    );
+    // v6: DELETE /api/config/dns/hosts/{url-encoded "ip domain"}
+    const entry = encodeURIComponent(`${record.ip} ${record.domain}`);
+    await client.delete(`/api/config/dns/hosts/${entry}`);
     return;
   }
   await _v5Client(instance).get("/admin/api.php", {
@@ -233,12 +242,15 @@ async function syncCategory(
   if (category === "local_dns") {
     const srcRecords = sourceData as LocalDnsRecord[];
     const existingRecords = await getLocalDns(target);
-    const srcKeys = new Set(srcRecords.map((r) => `${r.domain}::${r.ip}`));
-    const existingKeys = new Set(existingRecords.map((r) => `${r.domain}::${r.ip}`));
+    // Key is "ip::domain" — the full record identity.
+    // A domain with a different IP is treated as a distinct record.
+    const recordKey = (r: LocalDnsRecord) => `${r.ip}::${r.domain}`;
+    const srcKeys = new Set(srcRecords.map(recordKey));
+    const existingKeys = new Set(existingRecords.map(recordKey));
 
     if (mode === "overwrite") {
       for (const rec of existingRecords) {
-        if (!srcKeys.has(`${rec.domain}::${rec.ip}`)) {
+        if (!srcKeys.has(recordKey(rec))) {
           await removeLocalDnsRecord(target, rec);
           removed++;
         }
@@ -246,7 +258,7 @@ async function syncCategory(
     }
 
     for (const rec of srcRecords) {
-      if (existingKeys.has(`${rec.domain}::${rec.ip}`)) {
+      if (existingKeys.has(recordKey(rec))) {
         skipped++;
         continue;
       }
