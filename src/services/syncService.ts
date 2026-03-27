@@ -141,10 +141,11 @@ async function addLocalDnsRecord(
   if (instance.apiVersion === "v6") {
     await ensureV6Session(instance);
     const client = _v6Client(instance);
-    await client.post("/api/config/dns/hosts", {
-      ip: record.ip,
-      domain: record.domain,
-    });
+    // v6 stores custom DNS hosts as plain-text lines ("ip domain").
+    // The correct endpoint is PUT /api/config/dns/hosts/{entry} where the
+    // entry is the URL-encoded "ip domain" line.
+    const entry = encodeURIComponent(`${record.ip} ${record.domain}`);
+    await client.put(`/api/config/dns/hosts/${entry}`);
     return;
   }
   await _v5Client(instance).get("/admin/api.php", {
